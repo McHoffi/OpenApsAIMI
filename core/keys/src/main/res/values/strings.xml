@@ -451,6 +451,47 @@
 
     <string name="prefs_range_title">Range for visualization</string>
 
+    <string name="key_oaps_aimi_mealAdjFact">key_oaps_aimi_mealAdjFact</string>
+    <string name="key_oaps_aimi_meal_factor">key_oaps_aimi_meal_factor</string>
+    <string name="key_oaps_aimi_meal_interval">key_oaps_aimi_meal_interval</string>
+    <string name="key_oaps_aimi_highcarbAdjFact">key_oaps_aimi_highcarbAdjFact</string>
+    <string name="key_oaps_aimi_HC_factor">key_oaps_aimi_HC_factor</string>
+    <string name="key_oaps_aimi_HC_interval">key_oaps_aimi_HC_interval</string>
+    <string name="key_prebolus_snack_mode">key_prebolus_snack_mode</string>
+    <string name="key_oaps_aimi_snack_interval">key_oaps_aimi_snack_interval</string>
+    <string name="key_oaps_aimi_sleepAdjFact">key_oaps_aimi_sleepAdjFact</string>
+    <string name="key_oaps_aimi_sleep_factor">key_oaps_aimi_sleep_factor</string>
+    <string name="key_oaps_aimi_sleep_interval">key_oaps_aimi_sleep_interval</string>
+    <string name="key_oaps_aimi_snackAdjFact">key_oaps_aimi_snackAdjFact</string>
+    <string name="key_oaps_aimi_snack_factor">key_oaps_aimi_snack_factor</string>
+    <string name="key_use_AimiPregnancy">key_use_AimiPregnancy</string>
+    <string name="key_use_Aimi_honeymoon">key_use_Aimi_honeymoon</string>
+    <string name="key_oaps_aimi_highBG_interval">key_oaps_aimi_highBG_interval</string>
+    <string name="key_openapsaimi_high_bg_max_smb">key_openapsaimi_high_bg_max_smb</string>
+    <string name="OApsAIMI_Enable_night">OApsAIMI_Enable_night</string>
+    <string name="pref_title_oaps_aimi_night_mode">Night mode: shorter SMB interval at 23:00</string>
+    <string name="pref_summary_oaps_aimi_night_mode">During the 23:00 hour, SMB may be given a little more often when glucose is not rising fast and insulin on board is below the SMB limit. This does not make night SMB smaller.</string>
+    <string name="key_oaps_aimi_lunchAdjFact">key_oaps_aimi_lunchAdjFact</string>
+    <string name="key_oaps_aimi_dinnerAdjFact">key_oaps_aimi_dinnerAdjFact</string>
+    <string name="key_oaps_aimi_lunch_interval">key_oaps_aimi_lunch_interval</string>
+    <string name="key_oaps_aimi_dinner_interval">key_oaps_aimi_dinner_interval</string>
+    <string name="key_prebolus_lunch_mode">key_prebolus_lunch_mode</string>
+    <string name="key_prebolus_dinner_mode">key_prebolus_dinner_mode</string>
+    <string name="key_oaps_aimi_lunch_factor">key_oaps_aimi_lunch_factor</string>
+    <string name="key_oaps_aimi_dinner_factor">key_oaps_aimi_dinner_factor</string>
+    <string name="key_prebolus2_lunch_mode">key_prebolus2_lunch_mode</string>
+    <string name="key_prebolus2_dinner_mode">key_prebolus2_dinner_mode</string>
+    <string name="key_enable_ML_LearningRate">key_enable_ML_LearningRate</string>
+    <string name="key_enable_ML_FCL">key_enable_ML_FCL</string>
+    <string name="key_oaps_aimi_FCL_factor">key_oaps_aimi_FCL_factor</string>
+    <string name="key_oaps_aimi_FCLAdjFact">key_oaps_aimi_FCLAdjFact</string>
+    <string name="key_oaps_aimi_FCL_interval">key_oaps_aimi_FCL_interval</string>
+    <string name="key_oaps_aimi_BF_factor">key_oaps_aimi_BF_factor</string>
+    <string name="key_prebolus_BF_mode">key_prebolus_BF_mode</string>
+    <string name="key_prebolus2_BF_mode">key_prebolus2_BF_mode</string>
+    <string name="key_oaps_aimi_BFAdjFact">key_oaps_aimi_BFAdjFact</string>
+    <string name="key_oaps_aimi_BF_interval">key_oaps_aimi_BF_interval</string>
+
     <string name="pref_title_aimi_advisor_personal_oref_ml">AIMI Advisor: personal on-device risk model</string>
     <string name="pref_summary_aimi_advisor_personal_oref_ml">When you open Advisor, trains small models from recent loop+CGM features. Informational only; does not change insulin delivery.</string>
     <string name="pref_title_aimi_advisor_llm_rich_oref">AI Coach: include structured OREF insights</string>

@@ -849,8 +849,7 @@ class PersistenceLayerImpl @Inject constructor(
                     glucoseValues.asSequence().map { it.toDb() }.toList(),
                     calibrations.asSequence().map { it.toDb() }.toList(),
                     sensorInsertionTime,
-                    now = dateUtil.now(),
-                    nsClientData = caller == Sources.NSClient
+                    fromNsClient = caller == Sources.NSClient
                 )
             )
             val transactionResult = PersistenceLayer.TransactionResult<GV>()

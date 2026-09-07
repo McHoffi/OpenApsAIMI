@@ -11,6 +11,7 @@ import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.aps.GlucoseStatusSMB
 import app.aaps.core.interfaces.calibration.AddEntryResult
 import app.aaps.core.interfaces.calibration.CalibrationContext
+import app.aaps.core.interfaces.calibration.CalibrationStatus
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.notifications.NotificationAction
@@ -19,6 +20,8 @@ import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.plugins.calibration.keys.CalibrationLongKey
 import app.aaps.shared.tests.TestBase
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -41,6 +44,7 @@ class LinearCalibrationPluginTest : TestBase() {
     @Mock lateinit var persistenceLayer: PersistenceLayer
     @Mock lateinit var notificationManager: NotificationManager
     @Mock lateinit var glucoseStatusProvider: GlucoseStatusProvider
+    @Mock lateinit var preferences: Preferences
 
     private lateinit var plugin: LinearCalibrationPlugin
 
@@ -58,8 +62,9 @@ class LinearCalibrationPluginTest : TestBase() {
         whenever(persistenceLayer.getValidCalibrationEntriesSince(any())).thenReturn(emptyList())
         // Gap detection reads the stored readings, so every calibrate() touches this.
         whenever(persistenceLayer.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
+        whenever(preferences.get(CalibrationLongKey.IgnoredSensorGapAt)).thenReturn(0L)
         plugin = LinearCalibrationPlugin(
-            aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus
+            aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus, preferences
         )
     }
 
@@ -295,10 +300,58 @@ class LinearCalibrationPluginTest : TestBase() {
             actionsCaptor.capture(),
             anyOrNull()
         )
-        actionsCaptor.firstValue.single().action.invoke()
+        actionsCaptor.firstValue.first().action.invoke()
 
         verify(persistenceLayer).insertPumpTherapyEventIfNewByTimestamp(
             any(), any(), any(), any(), anyOrNull(), any()
+        )
+    }
+
+    @Test
+    fun calibrate_gapDetected_offersIgnoreWithoutLogging() = runTest {
+        whenever(rh.gs(any<Int>(), any())).thenReturn("Possible sensor change")
+        whenever(persistenceLayer.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(readingsWithGap())
+        plugin.calibrate(bucketed(listOf(now to 150.0)), CalibrationContext.NONE)
+
+        val actionsCaptor = argumentCaptor<List<NotificationAction>>()
+        verify(notificationManager).post(
+            any<NotificationId>(),
+            any<String>(),
+            any<NotificationLevel>(),
+            any<Int>(),
+            anyOrNull(),
+            actionsCaptor.capture(),
+            anyOrNull()
+        )
+        assertThat(actionsCaptor.firstValue).hasSize(2)
+
+        actionsCaptor.firstValue[1].action.invoke()
+        verify(persistenceLayer, never()).insertPumpTherapyEventIfNewByTimestamp(
+            any(), any(), any(), any(), anyOrNull(), any()
+        )
+        verify(preferences).put(CalibrationLongKey.IgnoredSensorGapAt, now - T.mins(30).msecs())
+    }
+
+    @Test
+    fun calibrate_ignoredGap_doesNotRenotifyAfterRestart() = runTest {
+        whenever(rh.gs(any<Int>(), any())).thenReturn("Possible sensor change")
+        whenever(persistenceLayer.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(readingsWithGap())
+        val ignoredAt = now - T.mins(30).msecs()
+        whenever(preferences.get(CalibrationLongKey.IgnoredSensorGapAt)).thenReturn(ignoredAt)
+
+        val restarted = LinearCalibrationPlugin(
+            aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus, preferences
+        )
+        restarted.calibrate(bucketed(listOf(now to 150.0)), CalibrationContext.NONE)
+
+        verify(notificationManager, never()).post(
+            any<NotificationId>(),
+            any<String>(),
+            any<NotificationLevel>(),
+            any<Int>(),
+            anyOrNull(),
+            any<List<NotificationAction>>(),
+            anyOrNull()
         )
     }
 
@@ -450,6 +503,58 @@ class LinearCalibrationPluginTest : TestBase() {
         whenever(persistenceLayer.getBgReadingsDataFromTimeToTime(any(), any(), eq(false)))
             .thenReturn(listOf(bgReading(now, 145.0)))
         assertThat(plugin.checkPreconditions()).isEqualTo(AddEntryResult.Accepted)
+    }
+
+    // ------------ status() ------------
+
+    @Test
+    fun status_noSession_returnsNoSession() = runTest {
+        whenever(persistenceLayer.getLastTherapyRecordUpToNow(TE.Type.SENSOR_CHANGE)).thenReturn(null)
+        assertThat(plugin.status()).isEqualTo(CalibrationStatus.NoSession)
+    }
+
+    @Test
+    fun status_inWarmUp_returnsWarmUpWithEndsAt() = runTest {
+        val sessionStart = now - T.hours(1).msecs()
+        whenever(persistenceLayer.getLastTherapyRecordUpToNow(TE.Type.SENSOR_CHANGE)).thenReturn(sensorChange(sessionStart))
+        val result = plugin.status()
+        assertThat(result).isEqualTo(CalibrationStatus.WarmUp(sessionStart + T.hours(2).msecs()))
+    }
+
+    @Test
+    fun status_oneEntry_returnsNeedMoreEntriesWithCount() = runTest {
+        whenever(persistenceLayer.getValidCalibrationEntriesSince(any()))
+            .thenReturn(listOf(entry(sensor = 100.0, fs = 110.0, ageDays = 1L)))
+        assertThat(plugin.status()).isEqualTo(CalibrationStatus.NeedMoreEntries(1))
+    }
+
+    @Test
+    fun status_slopeOutOfRange_returnsUnsafeFit() = runTest {
+        // Same fit as calibrate_slopeOutOfRange_returnsIdentity: slope 2.0 is outside [0.55, 1.6]
+        whenever(persistenceLayer.getValidCalibrationEntriesSince(any())).thenReturn(
+            listOf(
+                entry(sensor = 100.0, fs = 200.0, ageDays = 1L),
+                entry(sensor = 200.0, fs = 400.0, ageDays = 1L)
+            )
+        )
+        assertThat(plugin.status()).isEqualTo(CalibrationStatus.UnsafeFit)
+    }
+
+    @Test
+    fun status_clusteredEntries_returnsAppliedOffsetOnly() = runTest {
+        whenever(persistenceLayer.getValidCalibrationEntriesSince(any())).thenReturn(
+            listOf(
+                entry(sensor = 140.0, fs = 143.0, ageDays = 0L),
+                entry(sensor = 141.0, fs = 146.0, ageDays = 0L)
+            )
+        )
+        assertThat(plugin.status()).isEqualTo(CalibrationStatus.AppliedOffsetOnly)
+    }
+
+    @Test
+    fun status_validFit_returnsApplied() = runTest {
+        whenever(persistenceLayer.getValidCalibrationEntriesSince(any())).thenReturn(twoGoodEntries())
+        assertThat(plugin.status()).isEqualTo(CalibrationStatus.Applied)
     }
 
     // ------------ helpers ------------

@@ -513,7 +513,7 @@
     <string name="OApsAIMI_RemoteControlPin_summary">PIN for AIMI remote control features.</string>
     <string name="OApsAIMI_Enable_honeymoon">Child Mode (insulin needs lower than adult)</string>
     <string name="openapsaimi_highBG_maxsmb_title">Max SMB High BG</string>
-    <string name="OApsAIMI_Enable_night_title">Night Mode (SMB/2)</string>
+    <string name="OApsAIMI_Enable_night_title">Night mode: shorter SMB interval at 23:00</string>
 
     <!-- Learners Section -->
     <string name="oaps_aimi_learners_title">🎓 Learners</string>

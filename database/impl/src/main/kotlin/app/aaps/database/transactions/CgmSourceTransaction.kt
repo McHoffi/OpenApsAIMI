@@ -11,8 +11,7 @@ class CgmSourceTransaction(
     private val glucoseValues: List<GlucoseValue>,
     private val calibrations: List<Calibration>,
     private val sensorInsertionTime: Long?,
-    private val now: Long = System.currentTimeMillis(),
-    private val nsClientData: Boolean = false
+    private val fromNsClient: Boolean = false
 ) : Transaction<CgmSourceTransaction.TransactionResult>() {
 
     override suspend fun run(): TransactionResult {
@@ -24,20 +23,20 @@ class CgmSourceTransaction(
                 current?.let { existing -> glucoseValue.interfaceIDs.nightscoutId = existing.interfaceIDs.nightscoutId }
             // preserve invalidated status (user may delete record in UI)
             current?.let { existing -> glucoseValue.isValid = existing.isValid }
+            // A Nightscout round-trip must never overwrite a reading this app already stored itself:
+            // the app may have uploaded a corrected/smoothed sgv that raced its own recalculation cycle,
+            // and the echo coming back down must not clobber the raw value with that stale correction.
+            if (fromNsClient) current?.let { existing ->
+                glucoseValue.value = existing.value
+                glucoseValue.raw = existing.raw
+                glucoseValue.trendArrow = existing.trendArrow
+                glucoseValue.noise = existing.noise
+            }
             when {
                 // new record, create new
                 current == null                                                                             -> {
                     database.glucoseValueDao.insertNewEntry(glucoseValue)
                     result.inserted.add(glucoseValue)
-                }
-                // NS data must not replace a fresh local sensor reading. AAPS uploads the value it displays
-                // (calibrated and smoothed) as the NS sgv. NS pushes that value back as an echo. Accepting
-                // the echo replaces the raw sensor value with the displayed one. If the displayed value ever
-                // freezes, the loop pins itself: AAPS writes the frozen value to NS, NS writes it back.
-                // So keep the local content and only take over the NS id.
-                nsClientData && now - current.timestamp < FRESH_LOCAL_READING_MS                      -> {
-                    if (current.interfaceIDs.nightscoutId == null && glucoseValue.interfaceIDs.nightscoutId != null)
-                        updateNsIdOnly(current, glucoseValue, result)
                 }
                 // different record, update
                 !current.contentEqualsTo(glucoseValue)                                                      -> {
@@ -46,7 +45,11 @@ class CgmSourceTransaction(
                     result.updated.add(glucoseValue)
                 }
                 // update NS id if didn't exist and now provided
-                current.interfaceIDs.nightscoutId == null && glucoseValue.interfaceIDs.nightscoutId != null -> updateNsIdOnly(current, glucoseValue, result)
+                current.interfaceIDs.nightscoutId == null && glucoseValue.interfaceIDs.nightscoutId != null -> {
+                    current.interfaceIDs.nightscoutId = glucoseValue.interfaceIDs.nightscoutId
+                    database.glucoseValueDao.updateExistingEntry(current)
+                    result.updatedNsId.add(glucoseValue)
+                }
             }
         }
         calibrations.forEach {
@@ -77,12 +80,6 @@ class CgmSourceTransaction(
         return result
     }
 
-    private fun updateNsIdOnly(current: GlucoseValue, glucoseValue: GlucoseValue, result: TransactionResult) {
-        current.interfaceIDs.nightscoutId = glucoseValue.interfaceIDs.nightscoutId
-        database.glucoseValueDao.updateExistingEntry(current)
-        result.updatedNsId.add(glucoseValue)
-    }
-
     data class Calibration(
         val timestamp: Long,
         val value: Double,
@@ -103,11 +100,5 @@ class CgmSourceTransaction(
                 result.addAll(inserted)
                 result.addAll(updated)
             }
-    }
-
-    companion object {
-
-        /** Local readings younger than this keep their value when NS data for the same timestamp arrives. */
-        private const val FRESH_LOCAL_READING_MS = 15 * 60 * 1000L
     }
 }

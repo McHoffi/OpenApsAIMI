@@ -29,6 +29,18 @@ internal data class SmbBindingTrace(
     val finalOwner: String,
     val modelOutputU: Double?,
     val mpcOutputU: Double?,
+    /**
+     * What the solver asked for **before** the control barrier saw it, in U, or `null` when unknown.
+     *
+     * [modelOutputU] is read after the barrier, so a `0.000` there means either "the solver wanted
+     * nothing" or "the solver wanted a dose and the barrier removed it". Those two readings need
+     * opposite fixes. From 21:55 to 22:15 on 2026-09-05 the solver asked for 1.725, 1.350, 1.125,
+     * 1.575 and 1.575 U, the barrier permitted 0.000, and the trace exported a bare zero.
+     *
+     * `null` means "not known on this tick" and must never be read as zero. It stays `null` when the
+     * tick did not engage Autodrive, because then no solver ran.
+     */
+    val mpcRequestedU: Double?,
     val tier: String,
     val smallPrebolusPrefU: Double?,
     val largePrebolusPrefU: Double?,
@@ -43,6 +55,13 @@ internal data class SmbBindingTrace(
      */
     val maxSmbLadderBranch: String?,
     val slopeFromMinDeviation: Double?,
+    /**
+     * The `shortAvgDelta` the ladder read, mg/dL per 5 min.
+     *
+     * The rise branch opens on this value as well as on [slopeFromMinDeviation], so both are written
+     * out. Together they let a support package replay any candidate threshold on recorded ticks.
+     */
+    val shortAvgDeltaMgdl5m: Double?,
     val iobHeadroomU: Double?,
     val rbtBeforeU: Double?,
     val rbtAfterU: Double?,
@@ -71,6 +90,7 @@ internal data class SmbBindingTrace(
             put("stage_structure", "ORDERED_EVENTS_NOT_STRICTLY_CONTIGUOUS")
             putNullable("model_output_u", modelOutputU)
             putNullable("mpc_output_u", mpcOutputU)
+            putNullable("mpc_requested_u", mpcRequestedU)
             put("tier", tier)
             putNullable("small_prebolus_pref_u", smallPrebolusPrefU)
             putNullable("large_prebolus_pref_u", largePrebolusPrefU)
@@ -79,6 +99,7 @@ internal data class SmbBindingTrace(
             putNullable("max_smb_high_bg_u", maxSmbHighBgU)
             putNullable("max_smb_ladder_branch", maxSmbLadderBranch)
             putNullable("slope_from_min_deviation", slopeFromMinDeviation)
+            putNullable("short_avg_delta_mgdl_5m", shortAvgDeltaMgdl5m)
             putNullable("iob_headroom_u", iobHeadroomU)
             putNullable("rbt_before_u", rbtBeforeU)
             putNullable("rbt_after_u", rbtAfterU)
@@ -122,6 +143,8 @@ internal data class SmbBindingTrace(
         val finalOwner: String = "NONE",
         val modelOutputU: Double? = null,
         val mpcOutputU: Double? = null,
+        /** See [SmbBindingTrace.mpcRequestedU]. `null` until an engaged Autodrive tick fills it. */
+        val mpcRequestedU: Double? = null,
         val tier: String = "OFF",
         val smallPrebolusPrefU: Double? = null,
         val largePrebolusPrefU: Double? = null,
@@ -130,6 +153,7 @@ internal data class SmbBindingTrace(
         val maxSmbHighBgU: Double? = null,
         val maxSmbLadderBranch: String? = null,
         val slopeFromMinDeviation: Double? = null,
+        val shortAvgDeltaMgdl5m: Double? = null,
         val iobHeadroomU: Double? = null,
         val rbtBeforeU: Double? = null,
         val rbtAfterU: Double? = null,
@@ -165,6 +189,7 @@ internal data class SmbBindingTrace(
                 finalOwner = finalOwner,
                 modelOutputU = modelOutputU.finiteOrNull(),
                 mpcOutputU = mpcOutputU.finiteOrNull(),
+                mpcRequestedU = mpcRequestedU.finiteOrNull(),
                 tier = tier,
                 smallPrebolusPrefU = smallPrebolusPrefU.finiteOrNull(),
                 largePrebolusPrefU = largePrebolusPrefU.finiteOrNull(),
@@ -174,6 +199,7 @@ internal data class SmbBindingTrace(
                 maxSmbLadderBranch = maxSmbLadderBranch,
                 // NaN or Inf must never reach org.json — export null instead.
                 slopeFromMinDeviation = slopeFromMinDeviation.finiteOrNull(),
+                shortAvgDeltaMgdl5m = shortAvgDeltaMgdl5m.finiteOrNull(),
                 iobHeadroomU = iobHeadroomU.finiteOrNull(),
                 rbtBeforeU = rbtBeforeU.finiteOrNull(),
                 rbtAfterU = rbtAfterU.finiteOrNull(),

@@ -4,6 +4,7 @@ import app.aaps.plugins.aps.openAPSAIMI.physio.MealAbsorptionPhase
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -36,6 +37,18 @@ data class HarmoniaDecisionEnvironment(
      * - `>1.0` = use governor amp (capped).
      */
     val endocrineBasalAmp: Double? = null,
+    /**
+     * Runtime blocker that refused Harmonia on the **previous** tick, `null` when there was none.
+     *
+     * Doors for the export and for `HarmoniaCounterfactual` **only**. The decision never reads them:
+     * `evaluate`, `buildBlockers` and `chooseActionWithReason` all ignore them, and
+     * `HarmoniaDecisionEngineFeedbackIsInertTest` fails the build if that ever stops being true.
+     * They exist so the question "does Harmonia even know it was refused" has a place to be
+     * answered, before anything is wired.
+     */
+    val priorRuntimeBlocker: String? = null,
+    /** How many ticks in a row the same blocker refused Harmonia. Same rule: never read by the decision. */
+    val priorBlockedStreak: Int = 0,
     val seed: Long? = null,
 ) {
     fun toJsonObject(): JSONObject =
@@ -61,6 +74,8 @@ data class HarmoniaDecisionEnvironment(
             effectiveDiaHours?.let { put("effective_dia_h", it) }
             effectivePeakMinutes?.let { put("effective_peak_min", it) }
             put("body_kinetics", bodyKinetics.toJsonObject())
+            put("prior_runtime_blocker", priorRuntimeBlocker ?: JSONObject.NULL)
+            put("prior_blocked_streak", priorBlockedStreak)
             put("seed", seed ?: JSONObject.NULL)
         }
 }
@@ -156,6 +171,17 @@ data class HarmoniaProductionDecision(
     val selectedForProduction: Boolean,
     val requestedRateUph: Double?,
     val boundedRateUph: Double?,
+    /**
+     * The rate the pump was finally told to run, whoever decided it.
+     *
+     * This is **not** proof that Harmonia was followed. It is the final loop rate of the tick, which
+     * any later stage can have rewritten. On the night of 2026-09-05 the 18 ticks marked
+     * [HarmoniaProductionMode.APPLIED] all differ from [boundedRateUph] by more than 0.05 U/h; at
+     * 02:58 Harmonia asked for 0.85 U/h and the pump left at 3.14 U/h.
+     *
+     * Read `applied_matches_request` (from [appliedMatchesRequest]) to know whether this number is
+     * Harmonia's own.
+     */
     val appliedRateUph: Double?,
     val appliedDurationMin: Int?,
     val runtimeBlocker: String?,
@@ -165,6 +191,22 @@ data class HarmoniaProductionDecision(
     val reason: String,
     val version: Int = 1,
 ) {
+
+    /**
+     * True when the pump really ran the rate Harmonia asked for on this tick.
+     *
+     * Observation only: nothing in the loop reads it. It is `true` when [appliedRateUph] and
+     * [boundedRateUph] are both known and less than [APPLIED_MATCH_TOLERANCE_UPH] apart, `false`
+     * when they are both known and further apart, and `null` when either one is missing, because
+     * "we cannot tell" must never be exported as "no".
+     */
+    val appliedMatchesRequest: Boolean?
+        get() {
+            val applied = appliedRateUph?.takeIf { it.isFinite() } ?: return null
+            val bounded = boundedRateUph?.takeIf { it.isFinite() } ?: return null
+            return abs(applied - bounded) < APPLIED_MATCH_TOLERANCE_UPH
+        }
+
     fun toJsonObject(): JSONObject =
         JSONObject().apply {
             put("timestamp", timestampMs)
@@ -174,6 +216,7 @@ data class HarmoniaProductionDecision(
             put("requested_rate_uph", requestedRateUph ?: JSONObject.NULL)
             put("bounded_rate_uph", boundedRateUph ?: JSONObject.NULL)
             put("applied_rate_uph", appliedRateUph ?: JSONObject.NULL)
+            put("applied_matches_request", appliedMatchesRequest ?: JSONObject.NULL)
             put("applied_duration_min", appliedDurationMin ?: JSONObject.NULL)
             put("runtime_blocker", runtimeBlocker ?: JSONObject.NULL)
             put("safety_blockers", JSONArray(safetyBlockers))
@@ -185,12 +228,26 @@ data class HarmoniaProductionDecision(
             put("applies_to_pump", mode == HarmoniaProductionMode.APPLIED)
             put("source", "harmonia_production_branch_v1")
         }
+
+    companion object {
+
+        /** How close the pump rate must stay to the asked rate to count as the same command, U/h. */
+        const val APPLIED_MATCH_TOLERANCE_UPH: Double = 0.05
+    }
 }
 
 enum class HarmoniaProductionMode {
     SKIPPED,
     BLOCKED,
     READY,
+
+    /**
+     * Harmonia handed a rate over and the tick ended with a positive pump rate.
+     *
+     * It does **not** say the pump ran Harmonia's number. A later stage can replace the rate and the
+     * mode still reads `APPLIED`, so this value alone overstates how often Harmonia is followed. Use
+     * `applied_matches_request` for that.
+     */
     APPLIED,
 }
 
