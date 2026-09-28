@@ -79,6 +79,8 @@ fun OverviewScreenSplit(
     val config = LocalConfig.current
     val bgInfoState by graphViewModel.bgInfoState.collectAsStateWithLifecycle()
     val sensitivityUiState by chipsViewModel.sensitivityUiState.collectAsStateWithLifecycle()
+    val iobUiState by chipsViewModel.iobUiState.collectAsStateWithLifecycle()
+    val cobUiState by chipsViewModel.cobUiState.collectAsStateWithLifecycle()
     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
     val statusPanelState by graphViewModel.statusPanelFlow.collectAsStateWithLifecycle()
     val auditorState by graphViewModel.auditorStateFlow.collectAsStateWithLifecycle()
@@ -273,7 +275,7 @@ fun OverviewScreenSplit(
                     .verticalScroll(rememberScrollState())
                     .padding(start = 4.dp)
             ) {
-                GraphsSection(graphViewModel = graphViewModel, isSimpleMode = isSimpleMode)
+                GraphsSection(graphViewModel = graphViewModel, isSimpleMode = isSimpleMode, iobText = iobUiState.text, cobText = cobUiState.text)
             }
         }
     }

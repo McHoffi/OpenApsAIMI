@@ -5,7 +5,7 @@ import android.util.Base64
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.core.interfaces.resources.TextResolver
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec
 @Inject
 class OneTimePassword(
     private val preferences: Preferences,
-    private val rh: ResourceHelper,
+    private val rh: TextResolver,
     private val dateUtil: DateUtil,
     private val aapsLogger: AAPSLogger
 ) {

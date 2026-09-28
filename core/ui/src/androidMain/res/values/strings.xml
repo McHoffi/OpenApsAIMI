@@ -69,6 +69,9 @@
     <string name="configbuilder_switch_confirmation">This will disable %1$s and enable %2$s.</string>
     <string name="expand">Expand</string>
     <string name="collapse">Collapse</string>
+    <string name="state_completed" comment="Spoken state of a checklist task that is finished, said after the task name. The only other sign of it is a tick icon, so a screen reader needs this to tell done from still to do.">Completed</string>
+    <string name="state_expanded" comment="Spoken STATE of a section that is currently open, said after its name: Pump settings, expanded. Not the Expand button, which is the action - this is an adjective, and some languages word the two differently.">Expanded</string>
+    <string name="state_collapsed" comment="Spoken STATE of a section that is currently closed, said after its name: Pump settings, collapsed. Not the Collapse button, which is the action - this is an adjective, and some languages word the two differently.">Collapsed</string>
     <string name="no_compose_preferences">No preferences available for this plugin</string>
     <string name="confirm_password_hint">Confirm password</string>
     <string name="confirm_pin_hint">Confirm PIN</string>
@@ -133,7 +136,7 @@
     <string name="profile_switch_no_insulin">Cannot switch profile: no insulin is in use, and none was selected.</string>
     <string name="profile_switch_select_insulin_hint">No insulin is in use yet. Select the insulin you are using, so this profile switch can record it.</string>
     <string name="insulin_activation_failed">The insulin was not switched. Your previous insulin is still in use.</string>
-    <string name="insulin_activation_failed_reason" comment="%1$s=localized failure reason. Example: The insulin was not switched: Master not reachable. Your previous insulin is still in use.">The insulin was not switched: %1$s. Your previous insulin is still in use.</string>
+    <string name="insulin_activation_failed_reason" comment="%1$s=localized failure reason, a complete sentence that already ends with its own full stop, so do not add one after the placeholder. Example: The insulin was not switched: The master is offline. Your previous insulin is still in use.">The insulin was not switched: %1$s Your previous insulin is still in use.</string>
     <string name="insulin_activation_unconfirmed">The insulin switch could not be confirmed. Check which insulin is active in your profile before dosing.</string>
     <string name="fill_prime_failed_insulin_not_switched" comment="%1$s=the delivery error message from the failed prime. Shown as one message because the insulin switch was chained to the prime succeeding.">%1$s\n\nThe insulin was also not switched.</string>
     <string name="active">&lt;Active&gt;</string>
@@ -503,7 +506,7 @@
     <string name="treatment_afrezza_desc">Log inhaled Afrezza dose</string>
     <string name="treatment_carbs_desc">Record carbs without insulin</string>
     <string name="treatment_calculator_desc">Calculate bolus</string>
-    <string name="insulin_management">Insulin</string>
+    <string name="insulin_management" comment="Name of the screen for editing insulin types (DIA, peak). Must NOT translate to the same word as overview_insulin_label, which names the bolus action - both can sit next to each other on the quick launch toolbar, and one of them delivers insulin.">Insulin settings</string>
     <string name="manage_insulin_desc">Manage and activate insulin configurations</string>
     <string name="concentration_disable_blocked">Cannot disable concentration support while non-U100 insulins exist. Remove all non-U100 insulin configurations and switch to a U100 profile first.</string>
     <string name="simple_mode_blocked_by_concentration">Cannot enable simple mode while using non-U100 insulin. Switch to U100 insulin first.</string>
@@ -526,6 +529,9 @@
     <string name="treatment_cannula_change_desc">Record cannula/infusion set change</string>
     <string name="treatment_fill_desc">Prime and fill cannula</string>
     <string name="temp_basal">Temp basal</string>
+    <string name="tbr_state_above_profile" comment="Spoken state of the temp basal chip when the running rate is higher than the profile basal. Said after the chip name: Temp basal, above profile.">Above profile</string>
+    <string name="tbr_state_below_profile" comment="Spoken state of the temp basal chip when the running rate is lower than the profile basal. Said after the chip name: Temp basal, below profile.">Below profile</string>
+    <string name="tbr_state_none" comment="Spoken state of the temp basal chip when no temp basal is running, or the running one equals the profile basal.">None</string>
     <string name="user_entry">User entry</string>
     <string name="aaps">AAPS</string>
     <string name="glucosetype_finger">Finger</string>
@@ -780,6 +786,7 @@
     <string name="basal">Basal</string>
     <string name="basalpct">Basal %</string>
     <string name="sensitivity">Sensitivity</string>
+    <string name="autosens_state_off" comment="Spoken state of the sensitivity chip when autosens is switched off. The chip still shows a percentage, so without this a screen reader cannot tell that the figure is not being applied. Said after the chip name: Sensitivity, autosens off, 112%.">Autosens off</string>
     <string name="isf_for_carbs">Average ISF for Calculator and Carbs Absorption: %1$.1f</string>
     <string name="isf_profile">Profile ISF: %1$.1f</string>
     <string name="isf_variable">Variable ISF: %1$.1f</string>
@@ -831,7 +838,7 @@
     <string name="wizard_include_cob">Include COB</string>
     <string name="wizard_advanced">Advanced</string>
     <string name="wizard_calculation">Calculation</string>
-    <string name="no_action_selected">No action selected, nothing will happen</string>
+    <string name="no_action_selected">No action selected, nothing will happen.</string>
     <string name="carbs_removal_cob_limit" comment="Shown under the carbs field when removing carbs (a negative value). %1$d = grams of carbs currently on board, the maximum removable. Example: Max removal: 30 g (carbs on board)">Max removal: %1$d g (carbs on board)</string>
     <string name="carb_equal_zero_no_action">Carbs = 0. No action taken!</string>
     <string name="bolus_equal_zero_no_action">Bolus = 0. No action taken!</string>
@@ -897,6 +904,7 @@
     <string name="initializing">Initializing ...</string>
     <string name="secs" comment="second short">%1$d s</string>
     <string name="warning" comment="Generic warning dialog title">Warning</string>
+    <string name="critical" comment="Spoken severity of a status value that needs attention now, such as a cannula past its change day or a nearly empty reservoir. Said after the value: Cannula, 3 days, Critical.">Critical</string>
     <string name="alert" comment="Generic alert dialog title">Alert</string>
     <string name="retry" comment="Button label to retry a failed operation">Retry</string>
     <string name="finish" comment="Button label to complete a wizard/setup flow">Finish</string>

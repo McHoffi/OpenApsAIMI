@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
@@ -58,6 +60,8 @@ fun GlassSectionCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (onToggleExpanded != null) Modifier.clickable { onToggleExpanded() } else Modifier)
+                    // A heading, so a screen reader can jump between the sections of this screen.
+                    .semantics { heading() }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
