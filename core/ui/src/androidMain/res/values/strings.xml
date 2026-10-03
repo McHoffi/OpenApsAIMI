@@ -25,6 +25,8 @@
     <string name="navigation_error_screen_not_found">Screen could not be opened (not available in this configuration)</string>
     <string name="profile_set_ok">Basal profile in pump updated</string>
     <string name="invalid_input">Invalid input data</string>
+    <string name="carbs_optional_hint">Optional. A rough number is fine.</string>
+    <string name="carbs_recorded" comment="%1$.0f = carbs in grams. Example: Recorded 40 g of carbs.">Recorded %1$.0f g of carbs.</string>
     <string name="invalid_number">Invalid number</string>
     <string name="constraint_applied">Constraint applied!</string>
     <string name="tempbasals_iobtotal_label_string">Total IOB:</string>

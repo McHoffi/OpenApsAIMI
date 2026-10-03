@@ -98,12 +98,16 @@ import app.aaps.core.objects.extensions.directionToLegacyDrawable
 import app.aaps.core.objects.extensions.round
 import app.aaps.core.objects.overview.DashboardCoherentGlucose
 import app.aaps.core.objects.profile.ProfileSealed
+import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.MealCarbsInput
 import app.aaps.core.ui.dialogs.OKDialog
 import app.aaps.core.ui.extensions.displayText
 import app.aaps.core.ui.elements.SingleClickButton
 import app.aaps.core.ui.extensions.runOnUiThread
 import app.aaps.core.ui.extensions.toVisibility
 import app.aaps.core.ui.extensions.toVisibilityKeepSpace
+import app.aaps.core.ui.recordMealCarbs
+import app.aaps.core.ui.toast.ToastUtils
 import app.aaps.plugins.main.R
 import app.aaps.plugins.main.general.overview.OverviewDataImpl
 import app.aaps.plugins.main.general.overview.graphData.GraphData
@@ -758,7 +762,33 @@ class OverviewFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
                                     )
                                     it.text = event.title
                                     it.setOnClickListener {
-                                        uiInteraction.showOkCancelDialog(context = context, message = rh.gs(R.string.run_question, event.title), ok = { scope?.launch { automation.processEvent(event) } })
+                                        // Every user action gets the optional carb field. The button name is
+                                        // free form (often a dose size, not a meal), so there is nothing
+                                        // reliable to match on.
+                                        uiInteraction.showOkCancelDialogWithCarbs(
+                                            context = context,
+                                            message = rh.gs(R.string.run_question, event.title),
+                                            ok = { carbsText ->
+                                                scope?.launch {
+                                                    // The note arms the meal doses, so the mode runs first.
+                                                    // The carb row is only COB and statistics; if it fails,
+                                                    // the mode is already on.
+                                                    automation.processEvent(event)
+                                                    val mealCarbs = recordMealCarbs(
+                                                        persistenceLayer = persistenceLayer,
+                                                        raw = carbsText,
+                                                        maxCarbs = constraintChecker.getMaxCarbsAllowed().value().toDouble(),
+                                                        note = event.title,
+                                                        now = dateUtil.now()
+                                                    )
+                                                    when (mealCarbs) {
+                                                        is MealCarbsInput.Grams -> ToastUtils.okToast(context, rh.gs(CoreUiStrings.carbs_recorded, mealCarbs.amount))
+                                                        MealCarbsInput.Invalid  -> ToastUtils.errorToast(context, rh.gs(CoreUiStrings.invalid_input))
+                                                        MealCarbsInput.None     -> Unit
+                                                    }
+                                                }
+                                            }
+                                        )
                                     }
                                     binding.buttonsLayout.userButtonsLayout.addView(it)
                                     for (drawable in it.compoundDrawables) {

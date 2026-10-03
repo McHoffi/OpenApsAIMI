@@ -172,6 +172,10 @@ class UiInteractionImpl(
         alertDialogs.showOkCancelDialog(context, title, message, secondMessage, ok, cancel, icon)
     }
 
+    override fun showOkCancelDialogWithCarbs(context: Context, title: String, message: String, ok: ((carbsText: String) -> Unit)?, cancel: (() -> Unit)?) {
+        alertDialogs.showOkCancelDialogWithCarbs(context, title, message, ok, cancel)
+    }
+
     override fun openRunningModeScreen(activity: FragmentActivity) {
         activity.startActivity(Intent(activity, ComposeMainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT

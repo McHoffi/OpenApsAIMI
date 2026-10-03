@@ -15,11 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.clearFocusOnTap
 import app.aaps.core.ui.compose.htmlToAnnotatedString
 import app.aaps.core.ui.compose.stringResource
 
@@ -31,6 +33,7 @@ import app.aaps.core.ui.compose.stringResource
  * @param secondMessage Optional secondary message in accent color
  * @param icon Optional ImageVector icon
  * @param iconTint Optional tint color for the icon
+ * @param extraContent Optional content under the message, for example a text field
  * @param onConfirm Called when OK is clicked
  * @param onDismiss Called when Cancel is clicked or dialog is dismissed
  *
@@ -43,9 +46,11 @@ fun OkCancelDialog(
     secondMessage: String? = null,
     icon: ImageVector? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
+    extraContent: @Composable (() -> Unit)? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = icon?.let {
@@ -69,7 +74,9 @@ fun OkCancelDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clearFocusOnTap(focusManager),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -86,6 +93,10 @@ fun OkCancelDialog(
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall
                     )
+                }
+                extraContent?.let {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    it()
                 }
             }
         },
@@ -113,9 +124,11 @@ fun OkCancelDialog(
     secondMessage: String? = null,
     icon: ImageVector? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
+    extraContent: @Composable (() -> Unit)? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = icon?.let {
@@ -139,7 +152,9 @@ fun OkCancelDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clearFocusOnTap(focusManager),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -156,6 +171,10 @@ fun OkCancelDialog(
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall
                     )
+                }
+                extraContent?.let {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    it()
                 }
             }
         },

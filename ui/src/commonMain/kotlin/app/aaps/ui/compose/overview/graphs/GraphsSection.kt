@@ -93,6 +93,7 @@ import app.aaps.core.ui.compose.AapsSpacing
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.LocalDateUtil
 import app.aaps.core.ui.compose.LocalDecimalFormatter
+import app.aaps.core.ui.compose.MealCarbsField
 import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.core.ui.compose.LocalScreenOpener
 import app.aaps.core.ui.compose.NumberInputRow
@@ -730,7 +731,7 @@ fun GraphsSection(
                         // so it fires BEFORE OutlinedButtons consume the gesture
                         ModesPanel(
                             events = modesState.events,
-                            onRunEvent = { eventId -> graphViewModel.runAutomationEvent(eventId) },
+                            onRunEvent = { eventId, carbsText -> graphViewModel.runAutomationEvent(eventId, carbsText) },
                             onLongPress = if (!isSimpleMode) ({ editingGraphIndex = i }) else null,
                             modifier = Modifier.fillMaxWidth().height(secondary.height.dp)
                         )
@@ -952,7 +953,7 @@ private fun seriesShortNameId(type: SeriesType): TextRef = when (type) {
 @Composable
 internal fun ModesPanel(
     events: List<AutomationEventData>,
-    onRunEvent: (String) -> Unit,
+    onRunEvent: (eventId: String, carbsText: String) -> Unit,
     onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -1004,13 +1005,25 @@ internal fun ModesPanel(
     }
 
     pendingEvent?.let { event ->
+        // Reset when a different button opens the dialog. The field is always optional and is
+        // never remembered across presses: meals differ too much for a last value to be right.
+        var carbsText by remember(event) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { pendingEvent = null },
             title = { Text(event.title) },
-            text = { Text(stringResource(CoreUiStrings.run_event_question, event.title)) },
+            text = {
+                Column {
+                    Text(stringResource(CoreUiStrings.run_event_question, event.title))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MealCarbsField(
+                        value = carbsText,
+                        onValueChange = { carbsText = it }
+                    )
+                }
+            },
             confirmButton = {
                 Button(onClick = {
-                    onRunEvent(event.id)
+                    onRunEvent(event.id, carbsText)
                     pendingEvent = null
                 }) { Text(stringResource(CoreUiStrings.ok)) }
             },

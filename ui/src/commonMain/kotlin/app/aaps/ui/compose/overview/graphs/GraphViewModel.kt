@@ -53,6 +53,8 @@ import app.aaps.core.objects.extensions.convertedToAbsolute
 import app.aaps.core.ui.extensions.displayText
 import app.aaps.core.objects.extensions.round
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.MealCarbsInput
+import app.aaps.core.ui.recordMealCarbs
 import app.aaps.core.utils.MidnightUtils
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -60,9 +62,12 @@ import dev.zacsweers.metro.AssistedInject
 import dev.zacsweers.metro.Inject
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -617,13 +622,34 @@ class GraphViewModel(
         initialValue = PulseUiState()
     )
 
-    fun runAutomationEvent(eventId: String) {
+    /** One-shot user messages after a mode button runs. Shown as a snackbar by the screen. */
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /**
+     * Runs one Modes-panel button. [carbsText] is the optional meal carb field from its confirm
+     * dialog. Empty or `0` runs the mode only. The mode runs first: its note arms the meal doses,
+     * so a bad carb number must not stop them.
+     */
+    fun runAutomationEvent(eventId: String, carbsText: String = "") {
         viewModelScope.launch(aapsIoDispatcher) {
             val event = automation.events.value.firstOrNull { it.id == eventId } ?: return@launch
             automation.processEvent(event)
             aapsLogger.debug(LTag.APS, "[DashboardModes Graph] processEvent returned, invoking loop...")
             loop.invoke("DashboardModes", true)
             aapsLogger.debug(LTag.APS, "[DashboardModes Graph] loop.invoke returned")
+            val mealCarbs = recordMealCarbs(
+                persistenceLayer = persistenceLayer,
+                raw = carbsText,
+                maxCarbs = constraintChecker.getMaxCarbsAllowed().value().toDouble(),
+                note = event.title,
+                now = dateUtil.now()
+            )
+            when (mealCarbs) {
+                is MealCarbsInput.Grams -> _messages.emit(rh.gs(CoreUiStrings.carbs_recorded, mealCarbs.amount))
+                MealCarbsInput.Invalid  -> _messages.emit(rh.gs(CoreUiStrings.invalid_input))
+                MealCarbsInput.None     -> Unit
+            }
         }
     }
 

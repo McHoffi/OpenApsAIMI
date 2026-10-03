@@ -29,9 +29,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +82,11 @@ fun HistoryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    // This screen has its own snackbar host. Meal-carb feedback from the Modes buttons lands here.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(graphViewModel) {
+        graphViewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     // Stop any in-flight calculation when the screen pauses (backgrounding, etc.).
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -91,6 +99,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AapsTopAppBar(
                 title = { Text(title) },

@@ -51,8 +51,8 @@ class GraphsPanelHeightTest {
         compose.setContent {
             MaterialTheme {
                 Column {
-                    ModesPanel(events = events, onRunEvent = {}, modifier = Modifier.fillMaxWidth().height(60.dp))
-                    ModesPanel(events = events, onRunEvent = {}, modifier = Modifier.fillMaxWidth().height(200.dp))
+                    ModesPanel(events = events, onRunEvent = { _, _ -> }, modifier = Modifier.fillMaxWidth().height(60.dp))
+                    ModesPanel(events = events, onRunEvent = { _, _ -> }, modifier = Modifier.fillMaxWidth().height(200.dp))
                 }
             }
         }

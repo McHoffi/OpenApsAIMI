@@ -5,6 +5,10 @@ import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
@@ -23,6 +27,7 @@ import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.ui.R
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.LocalPreferences
+import app.aaps.core.ui.compose.MealCarbsField
 import app.aaps.core.ui.compose.dialogs.OkCancelDialog
 import app.aaps.core.ui.compose.dialogs.OkDialog
 import kotlinx.coroutines.CoroutineScope
@@ -73,6 +78,65 @@ class AlertDialogs(
 
     fun showOkCancelDialog(context: Context, title: String, message: String, secondMessage: String, ok: (() -> Unit)?, cancel: (() -> Unit)?, @DrawableRes icon: Int?) {
         showOkCancelComposeDialog(context, title, message, secondMessage, ok, cancel, icon)
+    }
+
+    /**
+     * OK/Cancel confirm with an optional meal carb field under the message.
+     *
+     * [ok] gets the raw text the user typed. Empty means no carbs. The dialog does not parse
+     * the text: an invalid amount must not block the action the dialog is about.
+     */
+    fun showOkCancelDialogWithCarbs(
+        context: Context,
+        title: String,
+        message: String,
+        ok: ((carbsText: String) -> Unit)?,
+        cancel: (() -> Unit)? = null
+    ) {
+        val dialog = Dialog(context)
+        val owner = ComposeDialogOwner()
+        val composeView = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(owner))
+            setContent {
+                CompositionLocalProvider(LocalPreferences provides preferences) {
+                    AapsTheme {
+                        var carbsText by remember { mutableStateOf("") }
+                        OkCancelDialog(
+                            title = title,
+                            message = message,
+                            extraContent = {
+                                MealCarbsField(
+                                    value = carbsText,
+                                    onValueChange = { carbsText = it }
+                                )
+                            },
+                            onConfirm = {
+                                val typed = carbsText
+                                dialog.dismiss()
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    delay(100)
+                                    ok?.invoke(typed)
+                                }
+                            },
+                            onDismiss = {
+                                dialog.dismiss()
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    delay(100)
+                                    cancel?.invoke()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        dialog.setContentView(composeView)
+        dialog.setCanceledOnTouchOutside(false)
+        dialog.setOnDismissListener { owner.destroy() }
+        dialog.show()
     }
 
     private fun showOkComposeDialog(context: Context, title: String, message: String, onFinish: (() -> Unit)?) {

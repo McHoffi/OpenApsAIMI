@@ -77,7 +77,9 @@ data class ActionConfirmation(
     val onConfirmAction: ConfirmableAction,
     val confirmLabel: String? = null,
     val secondaryAction: ConfirmableAction? = null,
-    val secondaryLabel: String? = null
+    val secondaryLabel: String? = null,
+    /** Show the optional meal carb field under the message. Used by automation user actions. */
+    val showCarbField: Boolean = false
 )
 
 /**

@@ -57,6 +57,16 @@ interface UiInteractionAndroid : UiInteraction {
      */
     fun showOkCancelDialog(context: Context, title: String = context.getString(R.string.confirmation), message: String, secondMessage: String, ok: (() -> Unit)?, cancel: (() -> Unit)? = null, @DrawableRes icon: Int? = null)
 
+    /**
+     * OK/Cancel confirm with an optional meal carb field under the message.
+     *
+     * @param ok runs on the UI thread when the OK button is clicked. It gets the raw carb text
+     * the user typed, empty when the field was left blank. The dialog does not parse the text:
+     * an invalid amount must not block the action the dialog is about.
+     * @param cancel runs on the UI thread when the Cancel button is clicked or the dialog is dismissed.
+     */
+    fun showOkCancelDialogWithCarbs(context: Context, title: String = context.getString(R.string.confirmation), message: String, ok: ((carbsText: String) -> Unit)?, cancel: (() -> Unit)? = null)
+
     /** Opens running mode management in the Compose-based main activity. */
     fun openRunningModeScreen(activity: FragmentActivity)
 

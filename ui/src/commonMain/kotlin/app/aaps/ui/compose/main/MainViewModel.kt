@@ -63,6 +63,8 @@ import app.aaps.core.objects.wizard.QuickWizard
 import app.aaps.core.objects.wizard.QuickWizardEntry
 import app.aaps.core.objects.wizard.QuickWizardMode
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.MealCarbsInput
+import app.aaps.core.ui.recordMealCarbs
 import app.aaps.core.ui.clientcontrol.failText
 import app.aaps.core.ui.compose.icons.IcAction
 import app.aaps.core.ui.compose.icons.IcAutomation
@@ -92,7 +94,10 @@ import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -190,6 +195,10 @@ class MainViewModel(
     /** Pending confirmation dialog (automation/TT preset actions) */
     private val _actionConfirmation = MutableStateFlow<ActionConfirmation?>(null)
     val actionConfirmation: StateFlow<ActionConfirmation?> = _actionConfirmation.asStateFlow()
+
+    /** One-shot user messages after a confirm dialog closes. Shown as a snackbar by the screen. */
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     val versionName: String get() = config.VERSION_NAME
     val calcProgressFlow: StateFlow<Int> = overviewDataCache.calcProgressFlow
@@ -695,7 +704,10 @@ class MainViewModel(
                 title = event.title,
                 message = message,
                 icon = IcAutomation,
-                onConfirmAction = ConfirmableAction.ExecuteAutomation(automationId)
+                onConfirmAction = ConfirmableAction.ExecuteAutomation(automationId),
+                // Every user action gets the optional carb field. The button name is free form
+                // (often a dose size, not a meal), so there is nothing reliable to match on.
+                showCarbField = true
             )
         }
     }
@@ -870,16 +882,28 @@ class MainViewModel(
         _actionConfirmation.update { null }
     }
 
-    fun executeConfirmableAction(action: ConfirmableAction) = viewModelScope.launch {
+    fun executeConfirmableAction(action: ConfirmableAction, carbsText: String = "") = viewModelScope.launch {
         _actionConfirmation.update { null }
         when (action) {
             is ConfirmableAction.ExecuteAutomation       -> {
                 val event = automation.findEventById(action.automationId) ?: return@launch
-                viewModelScope.launch {
-                    automation.processEvent(event)
-                    aapsLogger.debug(LTag.APS, "[DashboardModes Compose] processEvent returned, invoking loop...")
-                    loop.invoke("DashboardModes", true)
-                    aapsLogger.debug(LTag.APS, "[DashboardModes Compose] loop.invoke returned")
+                automation.processEvent(event)
+                aapsLogger.debug(LTag.APS, "[DashboardModes Compose] processEvent returned, invoking loop...")
+                loop.invoke("DashboardModes", true)
+                aapsLogger.debug(LTag.APS, "[DashboardModes Compose] loop.invoke returned")
+                // The note arms the meal doses, so the mode runs first. The carb row is only COB
+                // and statistics; if it fails, the mode is already on.
+                val mealCarbs = recordMealCarbs(
+                    persistenceLayer = persistenceLayer,
+                    raw = carbsText,
+                    maxCarbs = constraintChecker.getMaxCarbsAllowed().value().toDouble(),
+                    note = event.title,
+                    now = dateUtil.now()
+                )
+                when (mealCarbs) {
+                    is MealCarbsInput.Grams -> _messages.emit(rh.gs(CoreUiStrings.carbs_recorded, mealCarbs.amount))
+                    MealCarbsInput.Invalid  -> _messages.emit(rh.gs(CoreUiStrings.invalid_input))
+                    MealCarbsInput.None     -> Unit
                 }
             }
 

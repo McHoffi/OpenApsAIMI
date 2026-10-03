@@ -45,6 +45,7 @@ import app.aaps.core.interfaces.notifications.AapsNotification
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.pump.BolusProgressState
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.MealCarbsField
 import app.aaps.core.ui.compose.LocalDateUtil
 import app.aaps.core.ui.compose.LocalSnackbarHostState
 import app.aaps.core.ui.compose.dialogs.OkCancelDialog
@@ -167,6 +168,16 @@ fun MainScreen(
     // Sync automation state (otherwise missed after start)
     LaunchedEffect(Unit) {
         scenesViewModel.refreshState()
+    }
+
+    // One-shot messages from confirm dialogs (for example the optional meal carbs)
+    LaunchedEffect(Unit) {
+        mainViewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    // Meal-carb feedback from the Modes buttons in the graphs panel
+    LaunchedEffect(graphViewModel) {
+        graphViewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
     // Sync drawer state with ui state
@@ -537,6 +548,7 @@ fun MainScreen(
     // render a 3-button dialog; otherwise the standard 2-button OK/Cancel.
     val actionConfirmation by mainViewModel.actionConfirmation.collectAsStateWithLifecycle()
     actionConfirmation?.let { confirmation ->
+        var carbsText by remember(confirmation) { mutableStateOf("") }
         val secondaryAction = confirmation.secondaryAction
         val secondaryLabel = confirmation.secondaryLabel
         if (secondaryAction != null && secondaryLabel != null) {
@@ -555,7 +567,17 @@ fun MainScreen(
                 title = confirmation.title,
                 message = confirmation.message,
                 icon = confirmation.icon,
-                onConfirm = { mainViewModel.executeConfirmableAction(confirmation.onConfirmAction) },
+                extraContent = if (confirmation.showCarbField) {
+                    {
+                        MealCarbsField(
+                            value = carbsText,
+                            onValueChange = { carbsText = it }
+                        )
+                    }
+                } else {
+                    null
+                },
+                onConfirm = { mainViewModel.executeConfirmableAction(confirmation.onConfirmAction, carbsText) },
                 onDismiss = { mainViewModel.dismissActionConfirmation() }
             )
         }
