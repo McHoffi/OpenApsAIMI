@@ -10,6 +10,7 @@ import app.aaps.core.objects.workflow.WorkOutcome
 
 import app.aaps.plugins.sync.nsclientV3.DataSyncSelectorV3
 import app.aaps.plugins.sync.nsclientV3.NSClientV3Plugin
+import app.aaps.plugins.sync.nsclientV3.activity.ActivityUploader
 import dev.zacsweers.metro.Inject
 
 import kotlinx.coroutines.TimeoutCancellationException
@@ -21,6 +22,7 @@ class DataSyncRunner(
     private val aapsLogger: AAPSLogger,
 
     private val dataSyncSelectorV3: DataSyncSelectorV3,
+    private val activityUploader: ActivityUploader,
     private val activePlugin: ActivePlugin,
     private val nsClientV3Plugin: NSClientV3Plugin,
     private val nsClientRepository: NSClientRepository
@@ -36,7 +38,12 @@ class DataSyncRunner(
             try {
                 // Hard cap so a hung HTTP call / dead WS can't keep the worker in
                 // RUNNING/BLOCKED forever and silently block every future upload.
-                withTimeout(UPLOAD_TIMEOUT_MS) { dataSyncSelectorV3.doUpload() }
+                withTimeout(UPLOAD_TIMEOUT_MS) {
+                    dataSyncSelectorV3.doUpload()
+                    // Same cycle, same timeout. Activity is v1 and has its own cursors, so it does
+                    // not go through DataSyncSelectorV3 (see ActivityUploader).
+                    activityUploader.uploadPending()
+                }
                 nsClientRepository.addLog("► UPL", "End")
             } catch (e: TimeoutCancellationException) {
                 nsClientRepository.addLog("◄ ERROR", "Upload timed out")

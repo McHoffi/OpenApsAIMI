@@ -1227,6 +1227,8 @@ class NSClientV3Plugin(
                 items = listOf(
                     BooleanKey.NsClientUploadData,
                     BooleanKey.BgSourceUploadToNs,
+                    BooleanKey.NsClientUploadHeartRate,
+                    BooleanKey.NsClientUploadSteps,
                     BooleanKey.NsClientAcceptCgmData,
                     BooleanKey.NsClientAcceptProfileStore,
                     BooleanKey.NsClientAcceptTempTarget,

@@ -9,6 +9,7 @@ import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.plugins.sync.nsclientV3.DataSyncSelectorV3
 import app.aaps.plugins.sync.nsclientV3.NSClientV3Plugin
+import app.aaps.plugins.sync.nsclientV3.activity.ActivityUploader
 import app.aaps.plugins.sync.nsclientV3.compose.NSClientRepositoryImpl
 import app.aaps.shared.tests.TestBase
 import com.google.common.truth.Truth.assertThat
@@ -31,6 +32,7 @@ internal class DataSyncWorkerTest : TestBase() {
 
     @Mock lateinit var fabricPrivacy: FabricPrivacy
     @Mock lateinit var dataSyncSelectorV3: DataSyncSelectorV3
+    @Mock lateinit var activityUploader: ActivityUploader
     @Mock lateinit var activePlugin: ActivePlugin
     @Mock lateinit var nsClientV3Plugin: NSClientV3Plugin
     @Mock lateinit var context: Context
@@ -43,7 +45,7 @@ internal class DataSyncWorkerTest : TestBase() {
         TestListenableWorkerBuilder<DataSyncWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                    DataSyncWorker(appContext, workerParameters, aapsLogger, fabricPrivacy, DataSyncRunner(aapsLogger, dataSyncSelectorV3, activePlugin, nsClientV3Plugin, nsClientMvvmRepository))
+                    DataSyncWorker(appContext, workerParameters, aapsLogger, fabricPrivacy, DataSyncRunner(aapsLogger, dataSyncSelectorV3, activityUploader, activePlugin, nsClientV3Plugin, nsClientMvvmRepository))
             })
             .build()
 

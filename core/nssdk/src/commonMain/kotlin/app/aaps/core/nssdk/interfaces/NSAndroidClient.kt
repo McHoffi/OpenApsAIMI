@@ -8,6 +8,7 @@ import app.aaps.core.nssdk.localmodel.food.NSFood
 import app.aaps.core.nssdk.localmodel.treatment.CreateUpdateResponse
 import app.aaps.core.nssdk.localmodel.treatment.NSTreatment
 import app.aaps.core.nssdk.remotemodel.LastModified
+import app.aaps.core.nssdk.remotemodel.RemoteActivity
 import kotlinx.serialization.json.JsonObject
 
 interface NSAndroidClient {
@@ -43,6 +44,14 @@ interface NSAndroidClient {
     suspend fun createProfileStore(remoteProfileStore: JsonObject): CreateUpdateResponse
     suspend fun getProfileModifiedSince(from: Long): ReadResponse<List<JsonObject>>
     suspend fun getLastProfileStore(): ReadResponse<List<JsonObject>>
+
+    /**
+     * `POST /api/v1/activity` (API v1 only). Accepts one record or a batch.
+     *
+     * Returns the HTTP code in [CreateUpdateResponse.response]; 403 means the token has no
+     * `api:activity:create`. Does not throw on 4xx so the caller can hold its cursor.
+     */
+    suspend fun createActivities(records: List<RemoteActivity>): CreateUpdateResponse
 
     suspend fun createTreatment(nsTreatment: NSTreatment): CreateUpdateResponse
     suspend fun updateTreatment(nsTreatment: NSTreatment): CreateUpdateResponse

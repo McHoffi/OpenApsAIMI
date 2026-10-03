@@ -4,6 +4,7 @@ import app.aaps.core.nssdk.remotemodel.LastModified
 import app.aaps.core.nssdk.remotemodel.NSResponse
 import app.aaps.core.nssdk.remotemodel.RemoteCreateUpdateResponse
 import app.aaps.core.nssdk.remotemodel.RemoteDeviceStatus
+import app.aaps.core.nssdk.remotemodel.RemoteActivity
 import app.aaps.core.nssdk.remotemodel.RemoteEntry
 import app.aaps.core.nssdk.remotemodel.RemoteFood
 import app.aaps.core.nssdk.remotemodel.RemoteStatusResponse
@@ -21,6 +22,7 @@ import io.ktor.http.contentType
 import io.ktor.http.takeFrom
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -216,6 +218,20 @@ internal class NightscoutApi(
     @Suppress("UNUSED_PARAMETER")
     suspend fun deleteFood(identifier: String): NsHttpResponse<RemoteCreateUpdateResponse> =
         error("v3/food delete is not supported by Nightscout - no request is sent, see NightscoutApi.updateFood")
+
+    // ---------------------------------------------------------------- activity (v1 only)
+
+    /**
+     * `POST /api/v1/activity`. The one array body this client sends — v1 takes a single document or
+     * an array of them, and activity is uploaded in batches. There is no v3 activity collection.
+     *
+     * Auth is the same Bearer JWT as everything else here (see `NsAuth`); the token needs
+     * `api:activity:create`. No API secret.
+     */
+    suspend fun createActivities(records: List<RemoteActivity>) =
+        call(HttpMethod.Post, JsonElement.serializer()) {
+            nsUrl("v1", "activity"); jsonBody(records)
+        }
 
     // ---------------------------------------------------------------- profile
 

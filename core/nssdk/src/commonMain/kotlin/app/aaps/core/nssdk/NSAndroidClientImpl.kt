@@ -27,6 +27,7 @@ import app.aaps.core.nssdk.mapper.toTreatment
 import app.aaps.core.nssdk.networking.NsKtorClient
 import app.aaps.core.nssdk.networking.NsUrl
 import app.aaps.core.nssdk.remotemodel.LastModified
+import app.aaps.core.nssdk.remotemodel.RemoteActivity
 import app.aaps.core.nssdk.remotemodel.RemoteDeviceStatus
 import app.aaps.core.nssdk.remotemodel.RemoteEntry
 import app.aaps.core.nssdk.remotemodel.RemoteFood
@@ -369,6 +370,23 @@ class NSAndroidClientImpl(
             identifier = null,
             errorResponse = response.errorBody() ?: response.message()
         )
+    }
+
+    override suspend fun createActivities(records: List<RemoteActivity>): CreateUpdateResponse = callWrapper(dispatcher) {
+
+        val response = api.createActivities(records)
+        if (response.code == 200 || response.code == 201) {
+            return@callWrapper CreateUpdateResponse(response = response.code, identifier = null)
+        } else if (response.code in 400..499) {
+            // 403 is "no api:activity:create" and is a normal outcome for a read-only token.
+            // Returned rather than thrown so the caller can pause that type instead of retrying.
+            return@callWrapper CreateUpdateResponse(
+                response = response.code,
+                identifier = null,
+                errorResponse = response.errorBody() ?: response.message()
+            )
+        } else
+            throw UnsuccessfulNightscoutException(response.errorBody() ?: response.message())
     }
 
     override suspend fun createTreatment(nsTreatment: NSTreatment): CreateUpdateResponse = callWrapper(dispatcher) {

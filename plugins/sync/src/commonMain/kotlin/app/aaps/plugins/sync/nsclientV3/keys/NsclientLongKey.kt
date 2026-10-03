@@ -35,4 +35,11 @@ enum class NsclientLongKey(
     EffectiveProfileSwitchLastSyncedId("ns_effective_profile_switch_last_synced_id", 0L),
     RunningModeLastSyncedId("ns_running_mode_last_synced_id", 0L),
     ProfileStoreLastSyncedId("ns_profile_store_last_synced_timestamp", 0L),
+    /**
+     * Activity cursors hold an **event timestamp**, not a row id: `POST /api/v1/activity` has no
+     * id write-back, and the rule is "nothing at or before this time has still to go". Same
+     * `exportable = false` as the others — another phone's position is wrong here too.
+     */
+    HeartRateLastUploadedAt("ns_activity_heart_rate_last_uploaded_at", 0L),
+    StepsLastUploadedAt("ns_activity_steps_last_uploaded_at", 0L),
 }
