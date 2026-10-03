@@ -779,7 +779,12 @@ class LoopPlugin(
             }
             val pump = activePlugin.activePump
             var apsResult: APSResult? = null
-            if (!isEnabled()) return
+            // Every early return below logs why. A silent return looks the same as a run that
+            // decided to do nothing, and a meal button press then has to wait for the next BG.
+            if (!isEnabled()) {
+                aapsLogger.debug(LTag.APS, "invoke skip ($initiator): loop plugin is not enabled")
+                return
+            }
             val profile = profileFunction.getProfile()
             if (profile == null || !profileFunction.isProfileValid("Loop")) {
                 aapsLogger.debug(LTag.APS, rh.gs(CoreUiStrings.no_profile_set))
@@ -794,15 +799,25 @@ class LoopPlugin(
             }
 
             // Check if pump info is loaded
-            if (ch.fromPump(pump.baseBasalRate) < 0.01) return
-            val usedAPS = activePlugin.activeAPS ?: return
+            if (ch.fromPump(pump.baseBasalRate) < 0.01) {
+                aapsLogger.debug(LTag.APS, "invoke skip ($initiator): pump info is not loaded (baseBasalRate=${pump.baseBasalRate})")
+                return
+            }
+            val usedAPS = activePlugin.activeAPS
+            if (usedAPS == null) {
+                aapsLogger.debug(LTag.APS, "invoke skip ($initiator): no APS plugin selected")
+                return
+            }
             if (usedAPS.isEnabled()) {
                 usedAPS.invoke(initiator, tempBasalFallback)
                 apsResult = usedAPS.lastAPSResult
+            } else {
+                aapsLogger.debug(LTag.APS, "invoke skip ($initiator): APS plugin is not enabled")
             }
 
             // Check if we have any result
             if (apsResult == null) {
+                aapsLogger.debug(LTag.APS, "invoke skip ($initiator): no APS result")
                 rxBus.send(EventLoopSetLastRunGui(rh.gs(ApsStrings.no_aps_selected)))
                 return
             }
