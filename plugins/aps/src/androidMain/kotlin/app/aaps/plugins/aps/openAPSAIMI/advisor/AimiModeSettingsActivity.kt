@@ -17,29 +17,27 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.cardview.widget.CardView
 import androidx.lifecycle.lifecycleScope
+import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.data.model.TE
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
 import app.aaps.core.ui.extensions.applySystemBarPadding
-import app.aaps.core.interfaces.automation.Automation
-import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.plugins.aps.R
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.widget.Switch
 
 
 class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
 
-    @Inject lateinit var automation: Automation
     @Inject lateinit var rh: ResourceHelper
-
-    // Removed Inject to avoid Dagger graph issues with new Activity - REVERTED: Now we use Dagger
-    // private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     @Inject lateinit var preferences: Preferences
-    @Inject lateinit var persistenceLayer: app.aaps.core.interfaces.db.PersistenceLayer
+    @Inject lateinit var persistenceLayer: PersistenceLayer
     private val sp by lazy { getSharedPreferences("aimi_mode_activity", Context.MODE_PRIVATE) }
 
     private var selectedMode = ModeType.LUNCH
@@ -48,17 +46,12 @@ class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
     private lateinit var dinnerButton: TextView
     private lateinit var bfastButton: TextView
     private lateinit var highCarbButton: TextView
-    
+
     private lateinit var inputPrebolus1: EditText
     private lateinit var inputPrebolus2: EditText
     private lateinit var inputReactivity: EditText
     private lateinit var inputDuration: EditText
     private lateinit var inputInterval: EditText
-
-    // AI Settings Inputs
-    private lateinit var inputOpenAiKey: EditText
-    private lateinit var inputGeminiKey: EditText
-    private lateinit var switchProvider: Switch
 
     private val darkNavy = Color.parseColor("#0F172A")
     private val cardDark = Color.parseColor("#1E293B")
@@ -250,13 +243,6 @@ class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
         return input
     }
 
-    private fun getInputBackground(): android.graphics.drawable.Drawable {
-        return android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = 12f
-            setColor(Color.parseColor("#334155")) // Slightly lighter input bg
-        }
-    }
-
     private fun switchMode(mode: ModeType) {
         if (selectedMode == mode) return
         selectedMode = mode
@@ -382,7 +368,7 @@ class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
 
     private fun activateMode() {
         saveValues(false) // Save without closing logic merged.
-        
+
         val modeNote = when (selectedMode) {
             ModeType.LUNCH -> "Lunch"
             ModeType.DINNER -> "Dinner"
@@ -394,33 +380,34 @@ class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
         val durationMs = durationMin * 60 * 1000L
 
         AlertDialog.Builder(this)
-            .setTitle("Activate $modeNote mode?")
-            .setMessage("This will create a Note '$modeNote' ($durationMin min) to trigger AIMI logic.")
+            .setTitle(rh.gs(R.string.aimi_mode_activate_title, modeNote))
+            .setMessage(rh.gs(R.string.aimi_mode_activate_message, modeNote, durationMin))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val te = app.aaps.core.data.model.TE(
-                    timestamp = System.currentTimeMillis(),
-                    type = app.aaps.core.data.model.TE.Type.NOTE,
-                    note = modeNote,
-                    duration = durationMs,
-                    enteredBy = "AIMI Advisor",
-                    glucoseUnit = app.aaps.core.data.model.GlucoseUnit.MGDL
-                )
                 lifecycleScope.launch {
                     try {
                         withContext(Dispatchers.IO) {
-                            persistenceLayer.insertOrUpdateTherapyEvent(te)
+                            persistenceLayer.insertOrUpdateTherapyEvent(
+                                TE(
+                                    timestamp = System.currentTimeMillis(),
+                                    type = TE.Type.NOTE,
+                                    note = modeNote,
+                                    duration = durationMs,
+                                    enteredBy = "AIMI Advisor",
+                                    glucoseUnit = GlucoseUnit.MGDL,
+                                )
+                            )
                         }
                         Toast.makeText(
                             this@AimiModeSettingsActivity,
-                            "$modeNote Mode Activated ($durationMin min)!",
+                            rh.gs(R.string.aimi_mode_activated, modeNote, durationMin),
                             Toast.LENGTH_LONG
                         ).show()
                         finish()
                     } catch (e: Exception) {
                         Toast.makeText(
                             this@AimiModeSettingsActivity,
-                            "Error: ${e.message ?: e.toString()}",
+                            rh.gs(R.string.aimi_mode_error, e.message ?: e.toString()),
                             Toast.LENGTH_LONG
                         ).show()
                         e.printStackTrace()

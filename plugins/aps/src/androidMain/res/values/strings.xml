@@ -1525,4 +1525,10 @@
     <string name="boost_v6_shortname">BOOST V6</string>
     <string name="description_boost_v6">BOOST V6 Observe-Confirm-Commit dosing pipeline with meal hypothesis state machine</string>
 
+    <!-- AIMI meal mode settings screen -->
+    <string name="aimi_mode_activate_title" comment="%1$s = mode name: Breakfast, Lunch, Dinner or High Carb">Activate %1$s mode?</string>
+    <string name="aimi_mode_activate_message" comment="%1$s = mode name, %2$d = mode length in minutes. Note is a database entry.">This will add a note \"%1$s\" for %2$d minutes. AIMI will then dose the meal.</string>
+    <string name="aimi_mode_activated" comment="%1$s = mode name, %2$d = mode length in minutes">%1$s mode is on for %2$d minutes.</string>
+    <string name="aimi_mode_error" comment="%1$s = technical error text from the system">Could not activate the mode: %1$s</string>
+
 </resources>
