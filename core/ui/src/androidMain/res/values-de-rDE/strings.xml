@@ -544,11 +544,9 @@
     <string name="snooze_15m">15 Minuten schlummern</string>
     <string name="snooze_30m">30 Minuten schlummern</string>
     <string name="legacy_xml_preferences">Klassische Einstellungen (XML-Bildschirm)</string>
-    <string name="simple_mode">Einfacher Modus</string>
     <string name="expand">Erweitern</string>
     <string name="collapse">Zusammenklappen</string>
     <string name="no_compose_preferences">Für dieses Plugin sind keine Einstellungsoptionen verfügbar</string>
-    <string name="plugin_no_preferences">Das Plugin unterstützt keine Einstellungen</string>
     <string name="confirm_password_hint">Passwort bestätigen</string>
     <string name="confirm_pin_hint">PIN bestätigen</string>
     <string name="configbuilder_bgsource">Quelle: BG</string>
@@ -857,8 +855,6 @@
     <string name="pulse_panel_hypo_prefix">Hypo-Risiko —</string>
     <string name="pulse_panel_meta">SMB %1$s U · Basal %2$s · AutoSens %3$s%%</string>
     <string name="pulse_panel_hint">Tippen Sie hier, um die vollständige Begründung und den Verlauf anzuzeigen</string>
-    <string name="remove_items">Elemente entfernen</string>
-    <string name="sort_items">Elemente sortieren</string>
     <string name="scene_editor_reason">Grund</string>
     <string name="scene_editor_profile">Profil</string>
     <string name="scene_editor_note">Notiz</string>
