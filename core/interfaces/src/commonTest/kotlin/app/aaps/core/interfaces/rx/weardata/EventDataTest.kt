@@ -160,7 +160,7 @@ class EventDataTest {
             battery = "5", rigBattery = "6", openApsStatus = 7L, bgi = "8", batteryLevel = 9, patientName = "p",
             tempTarget = "t", tempTargetLevel = 1, tempTargetDuration = 10L, reservoirString = "r",
             reservoir = 11.0, reservoirLevel = 0, cobValue = 12.0, loopMode = LoopStatusData.LoopMode.SUSPENDED,
-            modeEndTime = 13L
+            modeEndTime = 13L, modeFromScene = true
         ).let {
             assertEquals(it, EventData.deserializeByte(it.serializeByte()))
             assertEquals(it, EventData.deserialize(it.serialize()))
@@ -236,6 +236,40 @@ class EventDataTest {
             assertEquals(it, EventData.deserializeByte(it.serializeByte()))
             assertEquals(it, EventData.deserialize(it.serialize()))
         }
+        // Scene follow-up on the watch: the Skip flag both ways, and the state that offers it
+        EventData.ActionSceneStopPreCheck(triggerChain = true).let {
+            assertEquals(it, EventData.deserializeByte(it.serializeByte()))
+            assertEquals(it, EventData.deserialize(it.serialize()))
+        }
+        EventData.ActionSceneStopConfirmed(triggerChain = true).let {
+            assertEquals(it, EventData.deserializeByte(it.serializeByte()))
+            assertEquals(it, EventData.deserialize(it.serialize()))
+        }
+        EventData.ActiveSceneState(active = true, sceneName = "Sleep", endTime = 1_000L, chainTargetName = "Wake up").let {
+            assertEquals(it, EventData.deserializeByte(it.serializeByte()))
+            assertEquals(it, EventData.deserialize(it.serialize()))
+        }
+        EventData.LoopStatusResponse(
+            timeStamp = 1L,
+            data = LoopStatusData(
+                0L, LoopStatusData.LoopMode.CLOSED, null, null, null, null, null, TargetRange("a", "b", "c", "u"), null,
+                activeScene = ActiveSceneInfo(name = "Sleep", endTime = null, chainTargetName = "Wake up")
+            )
+        ).let {
+            assertEquals(it, EventData.deserializeByte(it.serializeByte()))
+            assertEquals(it, EventData.deserialize(it.serialize()))
+        }
+    }
+
+    @Test
+    fun activeSceneStateFromAnOlderPhoneDecodesWithoutTheFollowUpFields() {
+        // A phone from before the follow-up fields sends only the boolean; the watch must not
+        // fall back to Error, and must see "no name, no end, no follow-up"
+        val decoded = EventData.deserialize("""{"type":"app.aaps.core.interfaces.rx.weardata.EventData.ActiveSceneState","active":true}""")
+        assertEquals(EventData.ActiveSceneState(active = true), decoded)
+        // And the other way round: an older watch reads a parameterless stop as "no chain"
+        val stop = EventData.deserialize("""{"type":"app.aaps.core.interfaces.rx.weardata.EventData.ActionSceneStopConfirmed"}""")
+        assertEquals(EventData.ActionSceneStopConfirmed(triggerChain = false), stop)
     }
 
     @Test

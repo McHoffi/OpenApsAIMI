@@ -162,6 +162,8 @@ class KeepAliveWorker(
         // Fork: glucose threshold alerts (hypo/hyper/rapid fall) fire from the keep-alive cadence.
         localAlertUtils.checkGlucoseAlerts()
         checkPump()
+        // Retries a missing zero TBR while the pump is disconnected - nothing else does, as the loop is paused
+        loop.verifyZeroDelivery()
         checkAPS()
         workerDbStatus()
         workerActiveStatus()
