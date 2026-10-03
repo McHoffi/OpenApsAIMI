@@ -349,10 +349,17 @@ class AIMIHealthConnectSyncServiceMTR @Inject constructor(
     }
     
     /**
-     * Checks if Health Connect sync is enabled in preferences
+     * Checks if Health Connect sync is enabled in preferences.
+     * Also gated by the user's activity source mode: with a direct watch source
+     * ("Wear direkt -> AAPS") or activity disabled, HC rows must not be written into
+     * the steps DB - they hold the sum of ALL HC origins and the dashboard would
+     * show that sum instead of the watch's value.
      */
     private fun isEnabled(): Boolean {
-        return sp.getBoolean(PREF_KEY_ENABLED, true) // Default: enabled
+        if (!sp.getBoolean(PREF_KEY_ENABLED, true)) return false // Default: enabled
+        val mode = sp.getString(UnifiedActivityProviderMTR.PREF_KEY_SOURCE_MODE, UnifiedActivityProviderMTR.DEFAULT_MODE)
+            ?: UnifiedActivityProviderMTR.DEFAULT_MODE
+        return mode != UnifiedActivityProviderMTR.MODE_PREFER_WEAR && mode != UnifiedActivityProviderMTR.MODE_DISABLED
     }
     
     /**

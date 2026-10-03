@@ -751,13 +751,13 @@ open class OpenAPSAutoISFPlugin(
             val allStepsCounts = when (sourceMode) {
                 UnifiedActivityProviderMTR.MODE_PREFER_WEAR ->
                     rawStepsCounts.filter { UnifiedActivityProviderMTR.isWearDevice(it.device) }
-                        .ifEmpty { rawStepsCounts.filter { it.device == "Garmin-Watchface" || it.device == "Garmin" } }
+                        .ifEmpty { rawStepsCounts.filter { UnifiedActivityProviderMTR.isGarminDevice(it.device) } }
                 UnifiedActivityProviderMTR.MODE_HEALTH_CONNECT_ONLY ->
                     rawStepsCounts.filter { it.device == "HealthConnect" }
                 UnifiedActivityProviderMTR.MODE_DISABLED ->
                     emptyList()
                 else -> // MODE_AUTO_FALLBACK (default): Garmin > Wear > HC/Phone
-                    rawStepsCounts.filter { it.device == "Garmin-Watchface" || it.device == "Garmin" }
+                    rawStepsCounts.filter { UnifiedActivityProviderMTR.isGarminDevice(it.device) }
                         .ifEmpty {
                             rawStepsCounts.filter { UnifiedActivityProviderMTR.isWearDevice(it.device) }
                                 .ifEmpty { rawStepsCounts.filter { it.device == "HealthConnect" || it.device == "PhoneSensor" } }

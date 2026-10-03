@@ -524,10 +524,16 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Fetches steps for last 7 days (daily totals)
+     * Fetches step counts from Health Connect (Garmin origin only).
      *
-     * @param ignoreUnifiedSourceMode si true, lit quand même Health Connect (ex. pipeline Physio quand
-     *        les pas Garmin sont dans HC mais le mode UI est « préférer la montre »).
+     * - [daysBack] > 0: trailing window of `daysBack` days. Returns the **average per day**.
+     *   Used by the physio pipeline for multi-day baselines.
+     * - [daysBack] <= 0: **calendar today**, local midnight to now. Returns that day's **total**.
+     *   Used for the loop's `stepsToday`, which must not include yesterday evening.
+     *
+     * @param ignoreUnifiedSourceMode when true, still reads Health Connect even if the unified
+     *        activity mode would skip it (for example the physio pipeline, when Garmin steps live
+     *        in HC but the UI mode is "prefer wear").
      */
     suspend fun fetchStepsData(daysBack: Int = 7, ignoreUnifiedSourceMode: Boolean = false): Int {
         if (!ignoreUnifiedSourceMode) {
@@ -551,8 +557,17 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                 withTimeout(API_TIMEOUT_MS) {
                     withContext(Dispatchers.IO) {
                         val now = Instant.now()
-                        val safeDaysBack = daysBack.coerceAtLeast(1)
-                        val startTime = now.minusSeconds((safeDaysBack * 24L * 60 * 60))
+                        // daysBack <= 0 means calendar today, not a trailing window. The caller wants
+                        // the day total (stepsToday), not an average over a one-day window that still
+                        // reaches back into yesterday evening.
+                        val todayOnly = daysBack <= 0
+                        val safeDaysBack = if (todayOnly) 1 else daysBack
+                        val startTime = if (todayOnly) {
+                            now.atZone(ZoneId.systemDefault()).toLocalDate()
+                                .atStartOfDay(ZoneId.systemDefault()).toInstant()
+                        } else {
+                            now.minusSeconds(safeDaysBack * 24L * 60 * 60)
+                        }
 
                         val response = client.aggregate(
                             AggregateRequest(
@@ -563,11 +578,15 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                         )
 
                         val totalSteps = response[StepsRecord.COUNT_TOTAL] ?: 0L
-                        val avgSteps = (totalSteps / safeDaysBack).toInt()
+                        val result = (totalSteps / safeDaysBack).toInt()
 
-                        cache[cacheKey] = CachedData(avgSteps, System.currentTimeMillis())
-                        aapsLogger.info(LTag.APS, "[$TAG] ✅ Steps (HC Aggregated, Garmin-only): total=$totalSteps, avg=$avgSteps/day")
-                        avgSteps
+                        cache[cacheKey] = CachedData(result, System.currentTimeMillis())
+                        if (todayOnly) {
+                            aapsLogger.info(LTag.APS, "[$TAG] ✅ Steps today (HC Aggregated, Garmin-only): total=$totalSteps")
+                        } else {
+                            aapsLogger.info(LTag.APS, "[$TAG] ✅ Steps (HC Aggregated, Garmin-only): total=$totalSteps, avg=$result/day")
+                        }
+                        result
                     }
                 }
             }
@@ -601,6 +620,9 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
      * The aggregate can refresh more slowly than step rows ingested into AAPS; the dashboard combines
      * this value with persistence totals so a lagging aggregate does not replace fresher DB rows.
      *
+     * The aggregate is filtered to the Garmin origin like [fetchStepsData], so other Health Connect
+     * sources (for example the phone's own pedometer) do not top up the watch's value.
+     *
      * Returns **null** when unified activity mode skips HC, HC is unavailable, or the query fails —
      * callers should fall back to persistence-layer bucket logic.
      */
@@ -633,11 +655,13 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                             timeRangeFilter = TimeRangeFilter.between(
                                 Instant.ofEpochMilli(dayStartMs),
                                 Instant.ofEpochMilli(nowMs)
-                            )
+                            ),
+                            dataOriginFilter = setOf(DataOrigin("com.garmin.android.apps.connectmobile"))
                         )
                     )
                     val total = response[StepsRecord.COUNT_TOTAL] ?: 0L
                     todayStepsAggCache.set(TodayStepsAggCache(dayStartMs, total, System.currentTimeMillis()))
+                    aapsLogger.info(LTag.APS, "[$TAG] ✅ Today steps HC aggregate: $total")
                     total
                 }
             }

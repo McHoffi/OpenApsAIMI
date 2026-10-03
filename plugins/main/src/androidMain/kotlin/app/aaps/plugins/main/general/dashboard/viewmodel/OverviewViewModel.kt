@@ -14,6 +14,7 @@ import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.HR
 import app.aaps.core.data.model.RM
 import app.aaps.core.data.model.SC
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.model.TB
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.model.TT
@@ -42,6 +43,8 @@ import app.aaps.core.interfaces.source.PromotionResult
 import app.aaps.core.interfaces.source.StagingState
 import app.aaps.core.interfaces.rx.AapsSchedulers
 import app.aaps.plugins.aps.openAPSAIMI.physio.AIMIPhysioDataRepositoryMTR
+import app.aaps.plugins.aps.openAPSAIMI.steps.UnifiedActivityProviderMTR
+import app.aaps.plugins.aps.openAPSAIMI.keys.AimiStringKey
 import app.aaps.plugins.aps.openAPSAIMI.trajectory.TrajectoryGuard // 🌀 Trajectory
 import app.aaps.plugins.aps.openAPSAIMI.autodrive.AutodriveEngine // 🧠 Engine
 import app.aaps.core.interfaces.aps.RT
@@ -773,13 +776,17 @@ class OverviewViewModel(
             // Early in the day, today's TIR rests on too few readings to mean anything.
             tirDayReady = tirTarget != null && now - from >= T.hours(TIR_DAY_READY_HOURS).msecs()
 
-            // --- Steps (Today): max(HC aggregate, persistence) when HC is in play ---
-            // Persistence uses max per-device 5‑min buckets → cannot merge complementary phone+watch like
-            // Health Connect / Santé, often ~1k low. HC [COUNT_TOTAL] can lag; taking the max of both
-            // avoids sticking on whichever pipeline is behind (HC cache cleared on SC updates elsewhere).
+            // --- Steps (Today): prefer the Garmin watchface delta chain; else max(HC, persistence) ---
+            // Garmin watchface deltas chain from midnight, so their sum is the watch's exact day total.
+            // Health Connect COUNT_TOTAL can double-count the same walk (Garmin Connect writes
+            // overlapping records), so when a delta chain is present we trust it over HC.
+            // Without a chain, fall back to max(HC aggregate, persistence): persistence uses max
+            // per-device 5-min buckets and can be low; HC can lag. Taking the max avoids sticking on
+            // whichever pipeline is behind (HC cache cleared on SC updates elsewhere).
             val persistenceSteps = computeDashboardPersistenceStepsToday(from, now)
             val hcTodaySteps = aimiPhysioDataRepository.fetchTodayStepsTotalAggregated(from, now)
             val chosenTotal: Double? = when {
+                persistenceSteps.hasGarminDeltaChain -> persistenceSteps.total
                 hcTodaySteps != null ->
                     max(
                         hcTodaySteps.toDouble().coerceAtLeast(0.0),
@@ -1386,50 +1393,94 @@ class OverviewViewModel(
     private data class DashboardPersistenceStepsToday(
         val hasRows: Boolean,
         val total: Double,
+        /**
+         * A Garmin watchface day-counter chain is present for today. Those rows are a day-start
+         * baseline plus poll-to-poll deltas, so [total] is then the watch's exact day total and
+         * should beat the Health Connect aggregate.
+         */
+        val hasGarminDeltaChain: Boolean = false,
     )
 
     /**
-     * Same 5‑min bucket / device pick as pre–Health Connect dashboard (wear → Garmin → HC rows → phone).
-     * Total is the maximum across devices only — it does not dedupe across devices like Health Connect / Santé;
-     * the dashboard combines this with the HC aggregate by taking the maximum of the two when HC is available.
+     * Day total from the steps DB: per-device deduped bucket sums (max of `steps5min` per 5-min bucket).
+     * Total is the maximum across the allowed devices only. Which devices are allowed follows the
+     * user's AIMI steps source mode, so "Wear direkt -> AAPS" shows the watch value and ignores the
+     * phone/HC rows the sync services write into the same table.
      */
     private suspend fun computeDashboardPersistenceStepsToday(from: Long, now: Long): DashboardPersistenceStepsToday {
         val stepsList = persistenceLayer.getStepsCountFromTimeToTime(from, now).sortedBy { it.timestamp }
         if (stepsList.isEmpty()) return DashboardPersistenceStepsToday(false, 0.0)
 
-        fun isGarmin(device: String?): Boolean = device == "Garmin-Watchface"
+        // Device label may vary ("garmin", "Garmin", "Garmin-Watchface", …); match the family.
+        fun isGarmin(device: String?): Boolean = StepDevices.isGarminFamily(device)
         fun isHealthConnect(device: String?): Boolean = device == "HealthConnect"
         fun isPhone(device: String?): Boolean = device == "PhoneSensor"
         fun isWear(device: String?): Boolean =
             !device.isNullOrBlank() && !isGarmin(device) && !isHealthConnect(device) && !isPhone(device)
 
-        val bestSource = stepsList
-            .firstOrNull { isWear(it.device) }?.device
-            ?: stepsList.firstOrNull { isGarmin(it.device) }?.device
-            ?: stepsList.firstOrNull { isHealthConnect(it.device) }?.device
-            ?: stepsList.firstOrNull { isPhone(it.device) }?.device
+        val devices = stepsList.mapNotNull { it.device.takeUnless(String::isNullOrBlank) }.distinct()
+        val garminDevices = devices.filter(::isGarmin)
+        val wearDevices = devices.filter(::isWear)
+        val hcDevices = devices.filter(::isHealthConnect)
+        val phoneDevices = devices.filter(::isPhone)
 
-        fun dedupedTotalForDevice(device: String): Double =
-            stepsList
-                .asSequence()
-                .filter { it.device == device }
-                .groupBy { it.timestamp / (5 * 60 * 1000L) }
-                .values
-                .sumOf { bucket -> bucket.maxOfOrNull { it.steps5min.coerceAtLeast(0) } ?: 0 }
-                .toDouble()
+        val sourceMode = preferences.get(AimiStringKey.ActivitySourceMode)
+        val allowedDevices = when (sourceMode) {
+            UnifiedActivityProviderMTR.MODE_PREFER_WEAR -> garminDevices + wearDevices
+            UnifiedActivityProviderMTR.MODE_HEALTH_CONNECT_ONLY -> hcDevices
+            UnifiedActivityProviderMTR.MODE_DISABLED -> emptyList()
+            else -> when {
+                garminDevices.isNotEmpty() -> garminDevices
+                wearDevices.isNotEmpty() -> wearDevices
+                else -> hcDevices + phoneDevices
+            }
+        }
+        if (allowedDevices.isEmpty()) return DashboardPersistenceStepsToday(false, 0.0)
 
-        val totalsByDevice = stepsList
-            .asSequence()
-            .mapNotNull { it.device.takeUnless(String::isNullOrBlank) }
-            .distinct()
-            .associateWith { dedupedTotalForDevice(it) }
+        val bestSource = (wearDevices + garminDevices + hcDevices + phoneDevices)
+            .firstOrNull { it in allowedDevices }
+
+        /** True when a watchface day-counter row exists for today in an allowed Garmin device. */
+        val hasGarminDeltaChain = allowedDevices.any { device ->
+            isGarmin(device) && StepDevices.isWatchface(device) &&
+                stepsList.any { it.device == device }
+        }
+
+        /**
+         * Two Garmin feeds write steps, tagged by device label (see [StepDevices]):
+         * - watchface day-counter rows: a day-start baseline plus poll-to-poll deltas in
+         *   `steps5min`. Their sum is the watch's exact day total.
+         * - CIQ window rows: trailing window counts that overlap each other. Keep the 5-min
+         *   bucket max for those.
+         * A row shape cannot tell the two apart: a baseline is a full total, and a CIQ row can
+         * have only `steps5min` set. The tags can.
+         */
+        fun dedupedTotalForDevice(device: String): Double {
+            val rows = stepsList.filter { it.device == device }
+            return when {
+                StepDevices.isWatchface(device) ->
+                    rows.sumOf { it.steps5min.coerceAtLeast(0) }.toDouble()
+                // CIQ windows measure the same walk as the watchface chain. When that chain is
+                // present it already is the day total; taking the max of the window sum in would
+                // only disagree with it.
+                StepDevices.isCiq(device) && hasGarminDeltaChain -> 0.0
+                else ->
+                    rows
+                        .groupBy { it.timestamp / (5 * 60 * 1000L) }
+                        .values
+                        .sumOf { bucket -> bucket.maxOfOrNull { it.steps5min.coerceAtLeast(0) } ?: 0 }
+                        .toDouble()
+            }
+        }
+
+        val totalsByDevice = allowedDevices.associateWith { dedupedTotalForDevice(it) }
 
         val totalSteps = totalsByDevice
             .values
             .maxOrNull()
             ?: if (bestSource != null) dedupedTotalForDevice(bestSource) else 0.0
 
-        return DashboardPersistenceStepsToday(true, totalSteps)
+        return DashboardPersistenceStepsToday(true, totalSteps, hasGarminDeltaChain)
     }
 
     class Factory(

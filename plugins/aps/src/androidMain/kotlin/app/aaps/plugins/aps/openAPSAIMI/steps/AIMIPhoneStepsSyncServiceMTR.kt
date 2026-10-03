@@ -89,6 +89,8 @@ class AIMIPhoneStepsSyncServiceMTR @Inject constructor(
      * Syncs StepService data → Database
      */
     private fun syncStepsToDatabase() {
+        // The timer keeps running after start(); re-check here so a mode change mid-day stops writes.
+        if (!isEnabled()) return
         try {
             val now = System.currentTimeMillis()
             
@@ -134,9 +136,15 @@ class AIMIPhoneStepsSyncServiceMTR @Inject constructor(
     }
     
     /**
-     * Checks if phone steps sync is enabled
+     * Checks if phone steps sync is enabled.
+     * Also gated by the user's activity source mode: with a direct watch source
+     * ("Wear direkt -> AAPS") or activity disabled, the phone sensor must not write
+     * into the steps DB - the dashboard would pick its rows over the watch's.
      */
     private fun isEnabled(): Boolean {
-        return sp.getBoolean(PREF_KEY_ENABLED, true) // Default: enabled
+        if (!sp.getBoolean(PREF_KEY_ENABLED, true)) return false // Default: enabled
+        val mode = sp.getString(UnifiedActivityProviderMTR.PREF_KEY_SOURCE_MODE, UnifiedActivityProviderMTR.DEFAULT_MODE)
+            ?: UnifiedActivityProviderMTR.DEFAULT_MODE
+        return mode != UnifiedActivityProviderMTR.MODE_PREFER_WEAR && mode != UnifiedActivityProviderMTR.MODE_DISABLED
     }
 }

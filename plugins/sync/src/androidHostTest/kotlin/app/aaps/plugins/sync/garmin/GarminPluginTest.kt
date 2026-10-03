@@ -3,6 +3,7 @@ package app.aaps.plugins.sync.garmin
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.SourceSensor
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.sharedPreferences.SP
@@ -187,7 +188,7 @@ class GarminPluginTest : TestBaseWithProfile() {
             steps["steps30"] as Int,
             steps["steps60"] as Int,
             steps["steps180"] as Int,
-            "garmin",
+            StepDevices.GARMIN_CIQ,
         )
     }
 
@@ -205,7 +206,7 @@ class GarminPluginTest : TestBaseWithProfile() {
             steps["steps30"] as Int,
             steps["steps60"] as Int,
             steps["steps180"] as Int,
-            "garmin",
+            StepDevices.GARMIN_CIQ,
         )
     }
 
@@ -433,7 +434,7 @@ class GarminPluginTest : TestBaseWithProfile() {
             params["steps30"] as Int,
             params["steps60"] as Int,
             params["steps180"] as Int,
-            "garmin",
+            StepDevices.GARMIN_CIQ,
         )
         // The answer also carries the last readings, which is the list stubbed above.
         verify(loopHub).getGlucoseValues(getGlucoseValuesFrom, true)

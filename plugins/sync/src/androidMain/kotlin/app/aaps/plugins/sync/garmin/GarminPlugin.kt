@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -513,7 +514,7 @@ class GarminPlugin(
                 getQueryParameter(uri, "s30", 0L).toInt(),
                 getQueryParameter(uri, "s60", 0L).toInt(),
                 getQueryParameter(uri, "s180", 0L).toInt(),
-                "garmin"
+                StepDevices.GARMIN_CIQ
             )
         } else {
             receiveSteps(uri)
@@ -642,7 +643,7 @@ class GarminPlugin(
             val totalSteps = getQueryParameter(uri, "steps")?.toIntOrNull() ?: -1
             aapsLogger.debug(LTag.GARMIN, "Garmin Swissalpine workarround. Receioved steps $totalSteps")
             if (totalSteps >= 0 ) {
-                ingestHttpTotalSteps(uri, totalSteps, samplingStart, samplingEnd)
+                ingestHttpTotalSteps(totalSteps, samplingStart, samplingEnd)
                 return
             }
 
@@ -666,10 +667,7 @@ class GarminPlugin(
         )
     }
 
-    private fun ingestHttpTotalSteps(uri: URI, totalSteps: Int, samplingStart: Long, samplingEnd: Long) {
-        val device = getQueryParameter(uri, "device")
-        val none = 0
-
+    private fun ingestHttpTotalSteps(totalSteps: Int, samplingStart: Long, samplingEnd: Long) {
         val now = System.currentTimeMillis()
         val lastTotal = sp.getInt(PREF_GARMIN_LAST_STEPS, -1)
 
@@ -682,89 +680,104 @@ class GarminPlugin(
         }
 
         val delta = totalSteps - lastTotal
+        // Read before the prefs below overwrite PREF_GARMIN_LAST_TS.
+        val isNewDay = lastSampledOnEarlierCalendarDay(now)
 
         // Guard rails: Only strict check is that delta must be positive.
         // We remove the 3000 upper limit because during a long run (e.g. 1h without sync),
         // the delta can easily exceed 3000 steps.
-        if (delta <= 0) {
-            // this case is reached in the morning on first sync.
-            // 06:19:31.848 [worker34759] I/GARMIN: [GarminPlugin.requestHandler$lambda$0():314]: get from /127.0.0.1:57440 resp , req: /sgv.json?brief_mode=true&count=24&steps=165&hr=77&hrStart=1770786871&hrEnd=1770787171&device=Garmin-Watchface
-            // 06:19:31.850 [worker34759] W/GARMIN: [GarminPlugin.ingestHttpTotalSteps():634]: [GarminHTTP] invalid step delta=-17341 (total=165 last=17506) => must be > 0
-            aapsLogger.warn(
+        if (delta > 0) {
+            aapsLogger.info(
                 LTag.GARMIN,
-                "[GarminHTTP] negative / 0 step delta=$delta (total=$totalSteps last=$lastTotal)"
+                "[GarminHTTP] steps delta=$delta (${Instant.ofEpochSecond(samplingStart)} → ${Instant.ofEpochSecond(samplingEnd)}) Total: $totalSteps"
             )
-            if (totalSteps > 0 && delta == 0) {
-                sp.putInt(PREF_GARMIN_LAST_STEPS, totalSteps)
-                sp.putLong(PREF_GARMIN_LAST_TS, now)
-                val midnight = LocalDate.now()
-                    .atStartOfDay(ZoneId.systemDefault())
-                    .toInstant()
-                    .toEpochMilli()
-                val todayCount = runBlocking {
-                    persistenceLayer.getStepsCountFromTimeToTime(midnight, now)
-                        // Device label may vary ("Garmin", "Garmin Connect", …); match family.
-                        .count { it.device.startsWith("garmin", ignoreCase = true) }
-                }
-                if (todayCount == 0) {
-                    aapsLogger.info(LTag.GARMIN, "[GarminHTTP] no records today, storing initial total=$totalSteps")
-                    loopHub.storeStepsCount(
-                        Instant.ofEpochSecond(samplingStart),
-                        Instant.ofEpochSecond(samplingEnd),
-                        totalSteps,
-                        none,
-                        none,
-                        none,
-                        none,
-                        none,
-                        "garmin"
-                    )
-                } else {
-                    aapsLogger.info(LTag.GARMIN, "[GarminHTTP] delta=0 but $todayCount records already today, skipping")
-                }
-                return
-            }
-            else
-            {
-                aapsLogger.warn(
-                    LTag.GARMIN,
-                    "[GarminHTTP] takeover initial total=$totalSteps "
-                )
-                sp.putInt(PREF_GARMIN_LAST_STEPS, totalSteps)
-                sp.putLong(PREF_GARMIN_LAST_TS, now)
-                loopHub.storeStepsCount(
-                    Instant.ofEpochSecond(samplingStart),
-                    Instant.ofEpochSecond(samplingEnd),
-                    totalSteps,
-                    none,
-                    none,
-                    none,
-                    none,
-                    none,
-                    "garmin"
-                )
+            sp.putInt(PREF_GARMIN_LAST_STEPS, totalSteps)
+            sp.putLong(PREF_GARMIN_LAST_TS, now)
+            storeWatchfaceTotal(samplingStart, samplingEnd, delta)
+            return
+        }
+
+        // this case is reached in the morning on first sync.
+        // 06:19:31.848 [worker34759] I/GARMIN: [GarminPlugin.requestHandler$lambda$0():314]: get from /127.0.0.1:57440 resp , req: /sgv.json?brief_mode=true&count=24&steps=165&hr=77&hrStart=1770786871&hrEnd=1770787171&device=Garmin-Watchface
+        // 06:19:31.850 [worker34759] W/GARMIN: [GarminPlugin.ingestHttpTotalSteps():634]: [GarminHTTP] invalid step delta=-17341 (total=165 last=17506) => must be > 0
+        aapsLogger.warn(
+            LTag.GARMIN,
+            "[GarminHTTP] negative / 0 step delta=$delta (total=$totalSteps last=$lastTotal)"
+        )
+        sp.putInt(PREF_GARMIN_LAST_STEPS, totalSteps)
+        sp.putLong(PREF_GARMIN_LAST_TS, now)
+
+        if (delta == 0 && totalSteps > 0) {
+            // Counter unchanged. Store the total once so the chain has a row, but only on the same
+            // day: the first-ever sample above writes no row, and the next poll confirms the total.
+            // On a new day an unchanged counter did not reset, so it is not today's total.
+            if (!isNewDay && !hasWatchfaceRowToday(now)) {
+                aapsLogger.info(LTag.GARMIN, "[GarminHTTP] no watchface records today, storing initial total=$totalSteps")
+                storeWatchfaceTotal(samplingStart, samplingEnd, totalSteps)
+            } else {
+                aapsLogger.info(LTag.GARMIN, "[GarminHTTP] delta=0, skipping")
             }
             return
         }
 
-        aapsLogger.info(
-            LTag.GARMIN,
-            "[GarminHTTP] steps delta=$delta (${Instant.ofEpochSecond(samplingStart)} → ${Instant.ofEpochSecond(samplingEnd)}) Total: $totalSteps"
-        )
+        // Negative delta: midnight day rollover, or a mid-day counter reset (watch reboot, Garmin
+        // Connect re-sync, watch app update).
+        if (isNewDay) {
+            // New day: the watch counter restarts at totalSteps. Store it as this day's chain
+            // baseline. Other garmin rows may already exist today (CIQ window rows are written
+            // overnight); they are a different feed and must not block the baseline.
+            aapsLogger.warn(LTag.GARMIN, "[GarminHTTP] new day takeover total=$totalSteps")
+            storeWatchfaceTotal(samplingStart, samplingEnd, totalSteps)
+        } else if (!hasWatchfaceRowToday(now)) {
+            aapsLogger.warn(LTag.GARMIN, "[GarminHTTP] takeover initial total=$totalSteps")
+            storeWatchfaceTotal(samplingStart, samplingEnd, totalSteps)
+        } else {
+            // Re-storing the full total would add it on top of the deltas already stored and
+            // roughly double the day count.
+            aapsLogger.warn(
+                LTag.GARMIN,
+                "[GarminHTTP] same-day counter reset, skipping re-store of total=$totalSteps"
+            )
+        }
+    }
 
-        sp.putInt(PREF_GARMIN_LAST_STEPS, totalSteps)
-        sp.putLong(PREF_GARMIN_LAST_TS, now)
+    /** One watchface day-counter row. [steps] is a day-start total or a poll-to-poll delta. */
+    private fun storeWatchfaceTotal(samplingStart: Long, samplingEnd: Long, steps: Int) {
         loopHub.storeStepsCount(
             Instant.ofEpochSecond(samplingStart),
             Instant.ofEpochSecond(samplingEnd),
-            delta,
-            none,
-            none,
-            none,
-            none,
-            none,
-            "garmin"
+            steps,
+            0,
+            0,
+            0,
+            0,
+            0,
+            StepDevices.GARMIN_WATCHFACE
         )
+    }
+
+    /**
+     * True when the previous watchface sample was on an earlier calendar day (or never stored).
+     * That is the midnight day rollover, not a mid-day counter reset.
+     */
+    private fun lastSampledOnEarlierCalendarDay(nowMs: Long): Boolean {
+        val lastTs = sp.getLong(PREF_GARMIN_LAST_TS, 0L)
+        if (lastTs <= 0L) return true
+        val zone = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(lastTs).atZone(zone).toLocalDate()
+            .isBefore(Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate())
+    }
+
+    /** True when this day already has a row from the watchface day-counter chain. */
+    private fun hasWatchfaceRowToday(nowMs: Long): Boolean {
+        val midnight = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return runBlocking {
+            persistenceLayer.getStepsCountFromTimeToTime(midnight, nowMs)
+                .any { StepDevices.isWatchface(it.device) }
+        }
     }
 
     private fun receiveSteps(
@@ -798,7 +811,7 @@ class GarminPlugin(
                 steps30,
                 steps60,
                 steps180,
-                "garmin",
+                StepDevices.GARMIN_CIQ,
             )
         } else {
             aapsLogger.warn(

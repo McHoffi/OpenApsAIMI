@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.steps
 
 import android.os.Looper
 import app.aaps.core.data.model.SC
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.model.HR
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -51,9 +52,6 @@ class UnifiedActivityProviderMTR @Inject constructor(
 
         private const val SOURCE_HC = "HealthConnect"
         private const val SOURCE_PHONE = "PhoneSensor"
-        private const val SOURCE_GARMIN = "Garmin-Watchface"
-        /** [LoopHubImpl.storeHeartRate] default when watchface omits `device`. */
-        private const val SOURCE_GARMIN_LEGACY = "Garmin"
 
         /** HC / phone sync may lag; beyond this, prefer bucket aggregation. */
         private const val MAX_ROW_AGE_MS = 10 * 60 * 1000L
@@ -105,13 +103,13 @@ class UnifiedActivityProviderMTR @Inject constructor(
             when (mode) {
                 MODE_PREFER_WEAR ->
                     records.filter { isWearDevice(it.device) }
-                        .ifEmpty { records.filter { it.device == SOURCE_GARMIN } }
+                        .ifEmpty { records.filter { isGarminDevice(it.device) } }
 
                 MODE_HEALTH_CONNECT_ONLY ->
                     records.filter { it.device == SOURCE_HC }
 
                 MODE_AUTO_FALLBACK -> {
-                    val garmin = records.filter { it.device == SOURCE_GARMIN }
+                    val garmin = records.filter { isGarminDevice(it.device) }
                     val wear = records.filter { isWearDevice(it.device) }
                     val hcPhone = records.filter { it.device == SOURCE_HC || it.device == SOURCE_PHONE }
                     when {
@@ -167,7 +165,7 @@ class UnifiedActivityProviderMTR @Inject constructor(
         }
 
         internal fun isGarminDevice(device: String?): Boolean =
-            device == SOURCE_GARMIN || device == SOURCE_GARMIN_LEGACY
+            StepDevices.isGarminFamily(device)
 
         internal fun isWearDevice(device: String?): Boolean {
             if (device == null) return false
@@ -191,7 +189,7 @@ class UnifiedActivityProviderMTR @Inject constructor(
 
             if (records.isEmpty()) return null
 
-            val garminRecord = selectLatestDeltaRecord(records.filter { it.device == SOURCE_GARMIN })
+            val garminRecord = selectLatestDeltaRecord(records.filter { isGarminDevice(it.device) })
             val wearRecord = selectLatestDeltaRecord(records.filter { isWearDevice(it.device) })
             val hcRecord = selectLatestDeltaRecord(records.filter { it.device == SOURCE_HC })
             val phoneRecord = selectLatestDeltaRecord(records.filter { it.device == SOURCE_PHONE })

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.SC
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.aps.APSResult
@@ -851,8 +852,9 @@ class GraphViewModel(
         // Tagesschritte direkt aus DB — gleicher Weg wie UnifiedActivityProvider
         val todayRecords = persistenceLayer.getStepsCountFromTimeToTime(midnight, now)
 
-        // Source-Priorität: Garmin > Wear > HC > Phone
-        val bestSource = todayRecords.map { it.device }.firstOrNull { it == "Garmin-Watchface" }
+        // Source-Priorität: Garmin watchface chain > other Garmin > Wear > HC > Phone
+        val bestSource = todayRecords.map { it.device }.firstOrNull { StepDevices.isWatchface(it) }
+            ?: todayRecords.map { it.device }.firstOrNull { StepDevices.isGarminFamily(it) }
             ?: todayRecords.map { it.device }.firstOrNull { it.startsWith("Wear") }
             ?: todayRecords.map { it.device }.firstOrNull { it == "HealthConnect" }
             ?: todayRecords.firstOrNull()?.device
@@ -864,12 +866,18 @@ class GraphViewModel(
             .values
             .sumOf { bucket -> bucket.maxOfOrNull { sc -> sc.steps5min.coerceAtLeast(0) } ?: 0 }
 
+        // Watchface rows are a day-counter chain (baseline + deltas); their sum is the day total.
+        // CIQ / HC / phone rows are overlapping windows; keep the 5-min bucket max for those.
+        fun dayTotal(records: List<SC>): Int =
+            if (StepDevices.isWatchface(bestSource)) records.sumOf { it.steps5min.coerceAtLeast(0) }
+            else maxPer5MinBucket(records)
+
         val sourceRecords = todayRecords.filter { it.device == bestSource }
-        val stepsToday = maxPer5MinBucket(sourceRecords)
+        val stepsToday = dayTotal(sourceRecords)
 
         val recentRecords = sourceRecords.filter { it.timestamp >= now - 15 * 60 * 1000L }
         val fiveMinAgo = now - 5 * 60 * 1000L
-        val stepsDelta = maxPer5MinBucket(recentRecords.filter { it.timestamp >= fiveMinAgo })
+        val stepsDelta = dayTotal(recentRecords.filter { it.timestamp >= fiveMinAgo })
 
         val stepsText = if (stepsToday > 0) "$stepsToday / +$stepsDelta" else "--"
 

@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.steps
 
 import app.aaps.core.data.model.HR
 import app.aaps.core.data.model.SC
+import app.aaps.core.data.model.StepDevices
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.sharedPreferences.SP
@@ -109,6 +110,14 @@ class UnifiedActivityProviderMTRTest {
     }
 
     @Test
+    fun `tagged Garmin feeds are not classified as Wear`() {
+        assertThat(UnifiedActivityProviderMTR.isGarminDevice(StepDevices.GARMIN_WATCHFACE)).isTrue()
+        assertThat(UnifiedActivityProviderMTR.isGarminDevice(StepDevices.GARMIN_CIQ)).isTrue()
+        assertThat(UnifiedActivityProviderMTR.isWearDevice(StepDevices.GARMIN_WATCHFACE)).isFalse()
+        assertThat(UnifiedActivityProviderMTR.isWearDevice(StepDevices.GARMIN_CIQ)).isFalse()
+    }
+
+    @Test
     fun `15m window sums Garmin HTTP deltas when steps15min unset`() {
         val fiveMinMs = 5 * 60_000L
         val rows = listOf(
@@ -126,7 +135,7 @@ class UnifiedActivityProviderMTRTest {
 
         assertThat(result).isNotNull()
         assertThat(result!!.steps).isEqualTo(100)
-        assertThat(result.source).isEqualTo("Garmin-Watchface")
+        assertThat(result.source).isEqualTo(StepDevices.GARMIN_WATCHFACE)
     }
 
     @Test
@@ -174,7 +183,7 @@ class UnifiedActivityProviderMTRTest {
             steps30min = 0,
             steps60min = 0,
             steps180min = 0,
-            device = "Garmin-Watchface",
+            device = StepDevices.GARMIN_WATCHFACE,
         )
 
     private fun hcStepsRow(steps5: Int, steps15: Int, timestamp: Long): SC =

@@ -43,6 +43,8 @@ object StepSourceResolver {
     fun canonical(raw: String): String = when {
         raw == WEAR || raw == PHONE -> raw
         raw == GARMIN || raw == GARMIN_PKG -> GARMIN
+        // Device labels from the Garmin feeds ("garmin-watchface", "garmin-ciq", "Garmin-Watchface", …).
+        raw.startsWith(GARMIN, ignoreCase = true) -> GARMIN
         raw.startsWith(HC_PREFIX) -> raw
         else -> HC_PREFIX + raw.substringAfterLast('.')   // a bare HC package name
     }
