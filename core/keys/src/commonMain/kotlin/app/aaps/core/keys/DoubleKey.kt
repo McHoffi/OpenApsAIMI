@@ -487,7 +487,20 @@ enum class DoubleKey(
     OApsAIMIZeroResumeFrac( key = "OApsAIMIZeroResumeFrac", defaultValue = 0.25, min = 0.05, max = 0.8, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMIKickerMinUph( key = "OApsAIMIKickerMinUph", defaultValue = 0.2, min = 0.05, max = 1.0, title = TextRef.Literal(""), unitType = UnitType.INSULIN_RATE),
     OApsAIMIKickerStep( key = "OApsAIMIKickerStep", defaultValue = 0.15, min = 0.05, max = 0.5, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2), // intensité du “kicker” plateau (incrément multiplicatif),
-    OApsAIMIMaxMultiplier( key = "OApsAIMIMaxMultiplier", defaultValue = 1.6, min = 1.0, max = 2.5, title = TextRef.Literal(""), unitType = UnitType.DOUBLE), // plafond multiplicatif de la basale (× profil),
+    /**
+     * Ceiling of the adaptive basal feature, as a multiple of the profile basal rate.
+     *
+     * Several adaptive-basal dosing paths read this value. It had no settings screen; see
+     * `AimiSettingsManifest.REACHABILITY_DEBT` for the reachability guarantee this closes.
+     */
+    OApsAIMIMaxMultiplier(
+        key = "OApsAIMIMaxMultiplier",
+        defaultValue = 1.6,
+        min = 1.0,
+        max = 2.5,
+        title = KeysStrings.pref_title_aimi_max_multiplier,
+        summary = KeysStrings.pref_summary_aimi_max_multiplier,
+        unitType = UnitType.DOUBLE),
     OApsAIMIR2Confident( key = "OApsAIMIR2Confident", defaultValue = 0.7, min = 0.3, max = 0.95, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMIPlateauBandAbs( key = "OApsAIMIPlateauBandAbs", defaultValue = 2.5, min = 0.5, max = 6.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE), // bande de tolérance du plateau (|Δ| ≤ X mg/dL/5m),
     OApsAIMIHyperDeepDevMgdl(
@@ -508,6 +521,13 @@ enum class DoubleKey(
         summary = KeysStrings.pref_summary_aimi_hyper_established_dev,
         dependency = BooleanKey.OApsAIMIHyperTrajectoryRelease,
         unitType = UnitType.MGDL),
+    /**
+     * Glucose level, in mg/dL, that AIMI treats as the start of a high reading.
+     *
+     * Several dosing paths read this value: the high-glucose correction logic, the plateau
+     * detector and the meal-rise gates. It had no settings screen; see
+     * `AimiSettingsManifest.REACHABILITY_DEBT` for the reachability guarantee this closes.
+     */
     OApsAIMIHighBg(
         key = "OApsAIMIHighBg",
         defaultValue = 180.0,
@@ -588,7 +608,18 @@ enum class DoubleKey(
         summary = KeysStrings.pref_summary_aimi_dyn_isf_trajectory_max_fraction,
         dependency = BooleanKey.OApsAIMIDynIsfTrajectoryTuningEnabled,
         unitType = UnitType.DOUBLE_3),
-    OApsAIMIIsfFusionMaxChangePerTick( "aimi_isf_fusion_max_change_per_tick", 0.4, 0.0, 0.5, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
+    /**
+     * Slew budget of the PKPD ISF fusion, as a fraction of the previous value, per 5-minute tick.
+     *
+     * The default is the same number the algorithm itself declares (the `maxChangePer5Min` default
+     * of `IsfFusionBounds` in `:plugins:aps`), so the preference and the code agree. It used to be
+     * 0.4, which allowed about +41 % up and -55 % down in one tick: two neighbour ticks could sit
+     * 3.1x apart and the dose-facing sensitivity swung between 16 and 135 mg/dL/U over one day.
+     *
+     * This default change makes the loop more stable (less swing) for every user who never touched
+     * the setting. The range is unchanged, so anyone who set a wider value on purpose keeps it.
+     */
+    OApsAIMIIsfFusionMaxChangePerTick( "aimi_isf_fusion_max_change_per_tick", 0.03, 0.0, 0.5, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMIIsfFusionMaxFactor( "aimi_isf_fusion_max_factor", 2.0, 1.0, 2.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE),
     OApsAIMIIsfFusionMinFactor( "aimi_isf_fusion_min_factor", 0.75, 0.3, 1.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMIDiaGovernorLearnedWeight( key = "aimi_dia_governor_learned_weight", defaultValue = 0.45, min = 0.0, max = 1.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),

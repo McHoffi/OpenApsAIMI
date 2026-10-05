@@ -1007,7 +1007,8 @@ private fun ControlPill(text: String) {
     }
 }
 
-private fun AimiBehaviorFamilyId.title(): TextRef =
+/** Visible beyond this file (not just `private`) so the settings audit screen can reuse the same titles. */
+internal fun AimiBehaviorFamilyId.title(): TextRef =
     when (this) {
         AimiBehaviorFamilyId.Protection -> ApsStrings.aimi_control_center_protection_title
         AimiBehaviorFamilyId.MealCapture -> ApsStrings.aimi_control_center_meal_title

@@ -5,16 +5,16 @@ import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import app.aaps.plugins.aps.openAPSAIMI.llm.claude.ClaudeModelResolver
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
 class ClaudeVisionProvider : AIVisionProvider {
-    override val displayName = "Claude (4.6 Sonnet)"
+    override val displayName = "Claude (model chosen in settings)"
     override val providerId = "CLAUDE"
-    val model = "claude-sonnet-4-6"
-    
+
     override suspend fun estimateFromImage(bitmap: Bitmap, userDescription: String, apiKey: String): EstimationResult = withContext(Dispatchers.IO) {
         try {
             val base64Image = bitmapToBase64(bitmap)
@@ -40,14 +40,13 @@ class ClaudeVisionProvider : AIVisionProvider {
         connection.setRequestProperty("anthropic-version", "2023-06-01")
         connection.doOutput = true
         connection.connectTimeout = 30000
-        connection.readTimeout = 45000
+        connection.readTimeout = 90000
         
         val userPrompt = MealVisionUserPrompt.buildAnalysisUserPrompt(userDescription)
 
         val jsonBody = JSONObject().apply {
-            put("model", model)
-            put("max_tokens", 2048)
-            put("temperature", 0.0)
+            put("model", ClaudeModelResolver.current())
+            put("max_tokens", 8192) // thinking tokens count in this limit on newer Claude models
             put("system", FoodAnalysisPrompt.SYSTEM_PROMPT)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
@@ -83,9 +82,7 @@ class ClaudeVisionProvider : AIVisionProvider {
     
     private fun parseResponse(jsonStr: String): EstimationResult {
         val root = JSONObject(jsonStr)
-        val content = root.getJSONArray("content")
-            .getJSONObject(0)
-            .getString("text")
+        val content = ClaudeModelResolver.extractText(root)
         return MealVisionJsonParser.parseModelContentToEstimation(content)
     }
 }

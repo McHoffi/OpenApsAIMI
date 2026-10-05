@@ -81,5 +81,11 @@ enum class ApsIntentKey(
         title = ApsStrings.aimi_adaptation_status_lab_entry_title,
         summary = ApsStrings.aimi_adaptation_status_lab_entry_summary,
         preferenceType = PreferenceType.ACTIVITY,
-    )
+    ),
+    AimiSettingsAudit(
+        key = "aimi_settings_audit_compose",
+        title = ApsStrings.aimi_settings_audit_entry_title,
+        summary = ApsStrings.aimi_settings_audit_entry_summary,
+        preferenceType = PreferenceType.ACTIVITY,
+    ),
 }

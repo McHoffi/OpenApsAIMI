@@ -45,6 +45,25 @@ interface LoopHub {
      *  or null if unavailable. Falls back to the profile ISF when the APS hasn't produced a value. */
     val variableSensInUnits: Double?
 
+    /**
+     * Remaining temporary basal duration in whole minutes, or null if no active TBR / EB.
+     * Used by Blueprint / Cockpit / Atelier watchfaces (`tbrMins`).
+     */
+    val temporaryBasalRemainingMinutes: Int?
+
+    /**
+     * Current glucose target in mg/dL for the watch (`target`):
+     * last APS/AIMI `targetBG` (DetermineBasalAIMI2) when available, else active TT midpoint,
+     * else profile rounded target.
+     */
+    val currentTargetMgdl: Double?
+
+    /**
+     * Active AIMI therapy mode short label for the watch (`FCL`, `DINNER`, `LUNCH`, …),
+     * or null when none is armed. Detected from Careportal NOTE keywords (same rules as `Therapy`).
+     */
+    val activeTherapyMode: String?
+
     /** Returns the lower bound of the target glucose range. */
     val lowGlucoseMark: Double
 
