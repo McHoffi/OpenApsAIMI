@@ -98,7 +98,7 @@ class MealAdvisorActivity : TranslatedDaggerAppCompatActivity() {
         })
 
         val spinner = android.widget.Spinner(this).apply {
-            val providers = arrayOf("OpenAI GPT-4o", "Gemini 3.0", "DeepSeek Chat", "Claude")
+            val providers = arrayOf("OpenAI", "Gemini", "DeepSeek Chat", "Claude")
             adapter = android.widget.ArrayAdapter(this@MealAdvisorActivity, android.R.layout.simple_spinner_item, providers).apply {
                 setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             }

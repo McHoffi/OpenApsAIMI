@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import app.aaps.plugins.aps.openAPSAIMI.llm.claude.ClaudeModelResolver
+import app.aaps.plugins.aps.openAPSAIMI.llm.openai.OpenAiModels
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -158,7 +159,7 @@ class AuditorAIService @Inject constructor(
      * Call OpenAI API
      */
     private fun callOpenAI(apiKey: String, prompt: String, useHighPerf: Boolean): String {
-        val model = if (useHighPerf) "gpt-4o" else "gpt-4o-mini"
+        val model = if (useHighPerf) OpenAiModels.HIGH else OpenAiModels.CHEAP
 
         val url = URL(OPENAI_URL)
         val connection = (url.openConnection() as HttpURLConnection).apply {

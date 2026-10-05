@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor
 import android.content.Context
 import org.json.JSONArray
 import app.aaps.plugins.aps.openAPSAIMI.llm.claude.ClaudeModelResolver
+import app.aaps.plugins.aps.openAPSAIMI.llm.openai.OpenAiModels
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -37,10 +38,6 @@ class AiCoachingService @Inject constructor() {
     companion object {
         private const val OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
-        private const val OPENAI_MODEL = "gpt-5.4-mini" // Efficient current GA tier for coaching (gpt-4o-mini is legacy)
-        
-
-        
         // DeepSeek Chat (OpenAI-compatible)
         private const val DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
         private const val DEEPSEEK_MODEL = "deepseek-chat"
@@ -380,7 +377,7 @@ class AiCoachingService @Inject constructor() {
     // whereas DeepSeek (older OpenAI-compatible spec) expects `max_tokens`.
     private fun buildOpenAiJson(prompt: String): JSONObject {
         val root = JSONObject()
-        root.put("model", OPENAI_MODEL)
+        root.put("model", OpenAiModels.CHEAP)
         val messages = JSONArray()
         // Unified: Prompt contains the full persona and instructions.
         val usr = JSONObject().put("role", "user").put("content", prompt)

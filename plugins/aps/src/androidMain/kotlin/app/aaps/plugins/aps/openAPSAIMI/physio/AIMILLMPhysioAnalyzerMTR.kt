@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import app.aaps.plugins.aps.openAPSAIMI.llm.claude.ClaudeModelResolver
+import app.aaps.plugins.aps.openAPSAIMI.llm.openai.OpenAiModels
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -209,7 +210,7 @@ class AIMILLMPhysioAnalyzerMTR @Inject constructor(
         val prompt = buildPrompt(features, baseline, context)
         
         val requestBody = JSONObject().apply {
-            put("model", "gpt-4")
+            put("model", OpenAiModels.HIGH)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")
@@ -287,10 +288,8 @@ class AIMILLMPhysioAnalyzerMTR @Inject constructor(
             // Thinking tokens count in this limit on newer Claude models.
             // The prompt keeps the text short, not this limit.
             put("max_tokens", 2000)
-            // Low effort: a short text does not need deep thinking. Haiku 4.5 rejects this field.
-            if (ClaudeModelResolver.supportsEffort(model)) {
-                put("output_config", JSONObject().apply { put("effort", "low") })
-            }
+            // Low effort: a short text does not need deep thinking.
+            put("output_config", JSONObject().apply { put("effort", "low") })
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "user")

@@ -35,13 +35,14 @@ class GeminiModelResolver @Inject constructor(
 
         // Fallback priority list. Durable aliases first (Google keeps *-latest pointing at the
         // current GA release), then confirmed GA concrete IDs. No preview/shut-down models here
-        // (gemini-2.0-flash, gemini-1.5-* and *-preview variants were retired).
+        // (gemini-2.5-*, gemini-2.0-flash, gemini-1.5-* and *-preview variants were retired).
         private val FALLBACK_PRIORITY = listOf(
             "gemini-flash-latest",
             "gemini-pro-latest",
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
             "gemini-3.5-flash",
-            "gemini-2.5-flash",
-            "gemini-2.5-pro"
+            "gemini-3.5-flash-lite"
         )
     }
 

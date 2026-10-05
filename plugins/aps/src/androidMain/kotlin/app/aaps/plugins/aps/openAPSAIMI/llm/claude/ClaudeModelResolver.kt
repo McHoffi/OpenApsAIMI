@@ -14,14 +14,13 @@ import org.json.JSONObject
  */
 object ClaudeModelResolver {
 
-    const val SONNET_5 = "claude-sonnet-5"
+    const val SONNET_5_5 = "claude-sonnet-5-5"
     const val FABLE_5_1 = "claude-fable-5-1"
     const val OPUS_5_5 = "claude-opus-5-5"
-    const val HAIKU_4_5 = "claude-haiku-4-5"
 
-    const val DEFAULT_MODEL = SONNET_5
+    const val DEFAULT_MODEL = SONNET_5_5
 
-    val KNOWN_MODELS: Set<String> = setOf(SONNET_5, FABLE_5_1, OPUS_5_5, HAIKU_4_5)
+    val KNOWN_MODELS: Set<String> = setOf(SONNET_5_5, FABLE_5_1, OPUS_5_5)
 
     @Volatile
     private var preferences: Preferences? = null
@@ -64,10 +63,4 @@ object ClaudeModelResolver {
         }
         return stored?.takeIf { it in KNOWN_MODELS } ?: DEFAULT_MODEL
     }
-
-    /**
-     * True when the model accepts `output_config.effort`.
-     * Haiku 4.5 rejects this field with an error, so we must not send it there.
-     */
-    fun supportsEffort(model: String): Boolean = model != HAIKU_4_5
 }

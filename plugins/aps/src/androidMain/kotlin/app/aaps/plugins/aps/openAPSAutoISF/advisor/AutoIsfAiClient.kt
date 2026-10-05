@@ -25,12 +25,12 @@ class AutoIsfAiClient {
 
     companion object {
         private const val OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-        private const val OPENAI_MODEL = "gpt-4o-mini"
+        private const val OPENAI_MODEL = "gpt-6-luna"
         private const val DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
         private const val DEEPSEEK_MODEL = "deepseek-chat"
         private const val CLAUDE_URL = "https://api.anthropic.com/v1/messages"
-        private const val CLAUDE_MODEL = "claude-haiku-4-5"
-        private const val GEMINI_MODEL = "gemini-1.5-flash-latest"
+        private const val CLAUDE_MODEL = "claude-sonnet-5-5"
+        private const val GEMINI_MODEL = "gemini-3.8-flash"
         private const val GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
     }
 

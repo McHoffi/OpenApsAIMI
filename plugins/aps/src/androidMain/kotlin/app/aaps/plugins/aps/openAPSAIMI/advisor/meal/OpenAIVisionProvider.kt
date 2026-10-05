@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor.meal
 
 import android.graphics.Bitmap
 import android.util.Base64
+import app.aaps.plugins.aps.openAPSAIMI.llm.openai.OpenAiModels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -11,7 +12,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class OpenAIVisionProvider : AIVisionProvider {
-    override val displayName = "OpenAI (GPT-4o Vision)"
+    override val displayName = "OpenAI (vision)"
     override val providerId = "OPENAI"
     
     override suspend fun estimateFromImage(bitmap: Bitmap, userDescription: String, apiKey: String): EstimationResult = withContext(Dispatchers.IO) {
@@ -43,7 +44,7 @@ class OpenAIVisionProvider : AIVisionProvider {
         val userPrompt = MealVisionUserPrompt.buildAnalysisUserPrompt(userDescription)
 
         val jsonBody = JSONObject().apply {
-            put("model", "gpt-4o")
+            put("model", OpenAiModels.HIGH)
             put("response_format", JSONObject().put("type", "json_object"))
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
