@@ -37,7 +37,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -160,6 +159,9 @@ class StatusViewModel(
         }
     }
 
+    // A Dana status read sends many pump status events in a row. requestRefresh coalesces them into
+    // one run, and only the newest cannula usage calculation is kept, so they cannot pile up on the
+    // database and stall the IOB calculation or the pump status read.
     private suspend fun refreshStateInternal(reasons: Set<RefreshReason>) {
             val profile = performanceProfile.value
             val now = dateUtil.now()
@@ -293,7 +295,7 @@ class StatusViewModel(
         // Calculate usage since last cannula change (expensive - can be deferred)
         val usage = if (includeTddCalculation && event != null) {
             withContext(aapsIoDispatcher) {
-                tddCalculator.calculateInterval(event.timestamp, dateUtil.now(), allowMissingData = false)?.totalAmount ?: 0.0
+                tddCalculator.calculateIntervalWithCachedDays(event.timestamp, dateUtil.now(), allowMissingData = false)?.totalAmount ?: 0.0
             }
         } else 0.0
 
