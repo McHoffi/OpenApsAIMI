@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Color
  * @property originalBgValue Color for regular CGM BG readings (white/outlined dots)
  * @property iobPrediction Color for IOB-based BG predictions (blue)
  * @property cobPrediction Color for COB-based BG predictions (orange)
+ * @property iobChart Muted blue for the IOB graph curve and its area fill
+ * @property cobChart Muted orange for the COB graph curve and its area fill
  * @property aCobPrediction Color for absorbed COB predictions (lighter orange)
  * @property uamPrediction Color for UAM (unannounced meals) predictions (yellow)
  * @property ztPrediction Color for zero-temp predictions (cyan)
@@ -81,6 +83,8 @@ data class GeneralColors(
     val originalBgValue: Color,
     val iobPrediction: Color,
     val cobPrediction: Color,
+    val iobChart: Color,
+    val cobChart: Color,
     val aCobPrediction: Color,
     val uamPrediction: Color,
     val ztPrediction: Color,
@@ -150,6 +154,8 @@ val LightGeneralColors = GeneralColors(
     originalBgValue = Color(0xFFFFFFFF),     // white for regular CGM readings (matches originalBgValueColor attr)
     iobPrediction = Color(0xFF1E88E5),       // blue for IOB predictions (matches iobColor attr)
     cobPrediction = Color(0xFFFB8C00),       // orange for COB predictions (matches cobColor attr)
+    iobChart = Color(0xFF6E96B8),            // muted steel blue for the IOB graph
+    cobChart = Color(0xFFC9A06C),            // muted ochre for the COB graph
     aCobPrediction = Color(0x80FB8C00),      // lighter orange for absorbed COB (50% alpha)
     uamPrediction = Color(0xFFC9BD60),       // yellow-ish for UAM predictions (matches uamColor attr)
     ztPrediction = Color(0xFF00D2D2),        // cyan for zero-temp predictions (matches ztColor attr)
@@ -213,6 +219,8 @@ val DarkGeneralColors = GeneralColors(
     originalBgValue = Color(0xFFFFFFFF),     // white for regular CGM readings (same in both modes)
     iobPrediction = Color(0xFF64B5F6),       // lighter blue for IOB predictions (dark mode)
     cobPrediction = Color(0xFFFFB74D),       // lighter orange for COB predictions (dark mode)
+    iobChart = Color(0xFF8FA8C4),            // muted soft blue for the IOB graph (dark mode)
+    cobChart = Color(0xFFC9B07A),            // muted soft tan for the COB graph (dark mode)
     aCobPrediction = Color(0x80FFB74D),      // lighter orange for absorbed COB (50% alpha, dark mode)
     uamPrediction = Color(0xFFE6D39A),       // lighter yellow for UAM predictions (dark mode)
     ztPrediction = Color(0xFF4DD4D4),        // lighter cyan for zero-temp predictions (dark mode)

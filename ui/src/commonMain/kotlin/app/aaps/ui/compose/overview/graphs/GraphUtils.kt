@@ -7,23 +7,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import app.aaps.core.graph.vico.Linear
 import app.aaps.core.interfaces.aps.MealHypothesisCoreState
 import app.aaps.core.interfaces.overview.graph.SeriesType
+import app.aaps.core.ui.compose.AapsTheme
+import app.aaps.core.ui.compose.ChartStyle
 import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
+import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import app.aaps.core.interfaces.overview.graph.ChartTbrSegment
 import com.patrykandpatrick.vico.compose.cartesian.decoration.Decoration
+import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
+import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -268,24 +278,172 @@ val InvertedTriangleShape: Shape = GenericShape { size, _ ->
 }
 
 /**
- * Creates a line for BG prediction series.
- * Transparent connecting line with small filled circle points in the given color.
- * Each prediction type (IOB, COB, UAM, ZT, aCOB) uses a different color.
+ * Maps a chart x-value (whole minutes from minTimestamp) to canvas pixels.
+ *
+ * Same transform as [NowLine] and the TBR lane: `layerBounds.left + startPadding +
+ * xSpacing * ((x - minX) / xStep) - scroll`. Kept in one place so a prediction fade
+ * stays glued to the data when the user scrolls or zooms.
  */
-fun createPredictionLine(color: Color): LineCartesianLayer.Line =
-    LineCartesianLayer.Line(
-        fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
-        areaFill = null,
-        pointProvider = LineCartesianLayer.PointProvider.single(
-            LineCartesianLayer.Point(
-                component = ShapeComponent(
-                    fill = Fill(color),
-                    shape = CircleShape
+fun CartesianDrawingContext.dataXToCanvasX(dataX: Double): Float {
+    val xStep = ranges.xStep
+    if (xStep == 0.0) return layerBounds.left
+    return layerBounds.left +
+        layerDimensions.startPadding +
+        layerDimensions.xSpacing * ((dataX - ranges.minX) / xStep).toFloat() -
+        scroll
+}
+
+/**
+ * Alpha for a point at [x] on a line that fades from [startDataX] to [endDataX].
+ * Outside that window the alpha is clamped to the nearer end. Pure — easy to unit-test.
+ */
+fun predictionFadeAlpha(
+    x: Double,
+    startDataX: Double,
+    endDataX: Double,
+    startAlpha: Float,
+    endAlpha: Float,
+): Float {
+    if (endDataX <= startDataX) return startAlpha
+    val t = ((x - startDataX) / (endDataX - startDataX)).toFloat().coerceIn(0f, 1f)
+    return startAlpha + (endAlpha - startAlpha) * t
+}
+
+/**
+ * Line fill that colours the stroke with a horizontal fade in **data space**.
+ *
+ * Vico's built-in brush fills are sized to the visible layer, so a plain
+ * `Brush.horizontalGradient` would fade toward the screen edge and slide when scrolling.
+ * This fill maps [startDataX] / [endDataX] to canvas x at draw time instead.
+ */
+class FadeLineFill(
+    private val color: Color,
+    private val startAlpha: Float,
+    private val endAlpha: Float,
+    private val startDataX: Double,
+    private val endDataX: Double,
+) : LineCartesianLayer.LineFill {
+    private val paint = Paint()
+
+    override fun draw(
+        context: CartesianDrawingContext,
+        halfLineThickness: Float,
+        verticalAxisPosition: Axis.Position.Vertical?,
+    ) {
+        with(context) {
+            val top = layerBounds.top - halfLineThickness
+            val bottom = layerBounds.bottom + halfLineThickness
+            val startX = dataXToCanvasX(startDataX)
+            val endX = dataXToCanvasX(endDataX).coerceAtLeast(startX + 1f)
+            val brush = Brush.horizontalGradient(
+                colors = listOf(
+                    color.copy(alpha = startAlpha),
+                    color.copy(alpha = endAlpha),
                 ),
-                size = 4.dp
+                startX = startX,
+                endX = endX,
             )
+            brush.applyTo(size = Size(layerBounds.width, bottom - top), p = paint, alpha = 1f)
+            canvas.drawRect(layerBounds.left, top, layerBounds.right, bottom, paint)
+        }
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is FadeLineFill &&
+            color == other.color &&
+            startAlpha == other.startAlpha &&
+            endAlpha == other.endAlpha &&
+            startDataX == other.startDataX &&
+            endDataX == other.endDataX
+
+    override fun hashCode(): Int {
+        var result = color.hashCode()
+        result = 31 * result + startAlpha.hashCode()
+        result = 31 * result + endAlpha.hashCode()
+        result = 31 * result + startDataX.hashCode()
+        result = 31 * result + endDataX.hashCode()
+        return result
+    }
+}
+
+/**
+ * Prediction dots whose alpha fades along the same data-space window as [FadeLineFill],
+ * so a series dissolves into the future instead of ending with a hard last dot.
+ */
+class FadePointProvider(
+    private val color: Color,
+    private val size: Dp,
+    private val startAlpha: Float,
+    private val endAlpha: Float,
+    private val startDataX: Double,
+    private val endDataX: Double,
+) : LineCartesianLayer.PointProvider {
+
+    override fun getPoint(
+        entry: LineCartesianLayerModel.Entry,
+        extraStore: ExtraStore,
+    ): LineCartesianLayer.Point {
+        val alpha = predictionFadeAlpha(entry.x, startDataX, endDataX, startAlpha, endAlpha)
+        return pointWithAlpha(alpha)
+    }
+
+    override fun getLargestPoint(extraStore: ExtraStore): LineCartesianLayer.Point =
+        pointWithAlpha(startAlpha)
+
+    private fun pointWithAlpha(alpha: Float): LineCartesianLayer.Point =
+        LineCartesianLayer.Point(
+            component = ShapeComponent(
+                fill = Fill(color.copy(alpha = alpha)),
+                shape = CircleShape,
+            ),
+            size = size,
         )
+}
+
+/**
+ * Creates a line for BG prediction series.
+ * Continuous connector and small filled circle points in the given color, both fading
+ * out toward the end of the prediction window (the far future).
+ * Each prediction type (IOB, COB, UAM, ZT, aCOB) uses a different color.
+ *
+ * @param fadeWindow chart x range `(start, end)` over which the fade runs — start is near
+ *   "now" (full alpha), end is the far future (lowest alpha). `null` keeps full alpha.
+ */
+fun createPredictionLine(
+    color: Color,
+    chartStyle: ChartStyle,
+    fadeWindow: Pair<Double, Double>?,
+): LineCartesianLayer.Line {
+    val fadeStartX = fadeWindow?.first ?: 0.0
+    val fadeEndX = fadeWindow?.second ?: 1.0
+    val lineStartAlpha = if (fadeWindow == null) 1f else chartStyle.predictionLineStartAlpha
+    val lineEndAlpha = if (fadeWindow == null) 1f else chartStyle.predictionLineEndAlpha
+    val pointStartAlpha = if (fadeWindow == null) 1f else chartStyle.predictionPointStartAlpha
+    val pointEndAlpha = if (fadeWindow == null) 1f else chartStyle.predictionPointEndAlpha
+    return LineCartesianLayer.Line(
+        fill = FadeLineFill(
+            color = color,
+            startAlpha = lineStartAlpha,
+            endAlpha = lineEndAlpha,
+            startDataX = fadeStartX,
+            endDataX = fadeEndX,
+        ),
+        stroke = LineCartesianLayer.LineStroke.Continuous(
+            thickness = chartStyle.predictionLineStrokeWidth,
+            cap = StrokeCap.Round,
+        ),
+        areaFill = null,
+        pointProvider = FadePointProvider(
+            color = color,
+            size = chartStyle.predictionPointSize,
+            startAlpha = pointStartAlpha,
+            endAlpha = pointEndAlpha,
+            startDataX = fadeStartX,
+            endDataX = fadeEndX,
+        ),
     )
+}
 
 /**
  * Softer BG prediction series: faint connector + smaller pastel dots (dashboard calm mode).
@@ -373,39 +531,208 @@ fun softenChartColor(accent: Color, surface: Color, amount: Float = 0.22f): Colo
     lerp(accent, surface, amount)
 
 /**
- * Horizontal band between [yLow] and [yHigh] (glycémie units), drawn under other decorations in the list order.
- * Uses the same vertical mapping as [DashboardTbrLaneDecoration] when axis bounds are fixed.
+ * Presentation-only "very high" BG threshold (Dexcom-style, mg/dL).
+ * Not a user preference. Above this the BG curve uses the same red as the low band.
  */
-class TargetComfortCorridorDecoration(
+const val VERY_HIGH_BG_MGDL: Double = 250.0
+
+/** Colour bands of the BG curve. Thresholds are in chart Y units (display units). */
+enum class BgBand { LOW, TARGET, HIGH, VERY_HIGH }
+
+/** One continuous run of the BG polyline that stays inside a single [BgBand]. */
+data class BgBandRun(
+    val band: BgBand,
+    val points: List<Pair<Double, Double>>,
+)
+
+/** Which BG-layer lines to emit into the Vico model, in model order. */
+data class BgLinePlan(
+    val hasAreaFill: Boolean = false,
+    val bandRuns: List<BgBand> = emptyList(),
+    val hasRegularDots: Boolean = false,
+    val hasBucketedDots: Boolean = false,
+    val hasSmb: Boolean = false,
+    val predictionIds: List<String> = emptyList(),
+)
+
+/** Band of a single Y value. At an exact threshold the value counts as the upper band. */
+fun bgBandOf(y: Double, lowMark: Double, highMark: Double, veryHigh: Double): BgBand = when {
+    y < lowMark  -> BgBand.LOW
+    y < highMark -> BgBand.TARGET
+    y < veryHigh -> BgBand.HIGH
+    else         -> BgBand.VERY_HIGH
+}
+
+/**
+ * Colour for a [BgBand]. Low and very high share the red colour ("tief = rot", "sehr hoch = rot"),
+ * same mapping as the BG curve bands.
+ */
+fun bgBandColor(
+    band: BgBand,
+    low: Color,
+    target: Color,
+    high: Color,
+): Color = when (band) {
+    BgBand.LOW,
+    BgBand.VERY_HIGH -> low
+    BgBand.TARGET    -> target
+    BgBand.HIGH      -> high
+}
+
+/**
+ * Split a sorted (x, y) polyline into colour runs by [BgBand].
+ *
+ * Inserts a synthetic point at each threshold crossing so the colour changes exactly at the
+ * limit. Adjacent runs share that crossing point, so the line stays continuous. Each run's
+ * band is taken from the midpoint of its first and last Y, which is always strictly inside
+ * one band.
+ *
+ * Pure function — no chart or theme dependency.
+ */
+fun splitBgLineByBand(
+    points: List<Pair<Double, Double>>,
+    lowMark: Double,
+    highMark: Double,
+    veryHigh: Double,
+): List<BgBandRun> {
+    if (points.isEmpty()) return emptyList()
+    if (points.size == 1) {
+        return listOf(BgBandRun(bgBandOf(points[0].second, lowMark, highMark, veryHigh), points))
+    }
+    val thresholds = listOf(lowMark, highMark, veryHigh)
+    val runs = mutableListOf<List<Pair<Double, Double>>>()
+    var current = mutableListOf(points[0])
+
+    fun closeRun() {
+        if (current.size >= 2) runs.add(current)
+        current = mutableListOf()
+    }
+
+    for (i in 1 until points.size) {
+        val p1 = points[i - 1]
+        val p2 = points[i]
+        val y1 = p1.second
+        val y2 = p2.second
+        val crossings = if (y1 == y2) {
+            emptyList()
+        } else {
+            val minY = minOf(y1, y2)
+            val maxY = maxOf(y1, y2)
+            thresholds.mapNotNull { t ->
+                // Strictly between the endpoints: a point already on a threshold is not a crossing.
+                if (t <= minY || t >= maxY) {
+                    null
+                } else {
+                    val frac = (t - y1) / (y2 - y1)
+                    (p1.first + frac * (p2.first - p1.first)) to t
+                }
+            }.sortedBy { it.first }
+        }
+        if (crossings.isEmpty()) {
+            current.add(p2)
+        } else {
+            for ((cx, cy) in crossings) {
+                current.add(cx to cy)
+                closeRun()
+                current = mutableListOf(cx to cy)
+            }
+            current.add(p2)
+        }
+    }
+    closeRun()
+
+    return runs.map { pts ->
+        val bandY = (pts.first().second + pts.last().second) / 2.0
+        BgBandRun(bgBandOf(bandY, lowMark, highMark, veryHigh), pts)
+    }
+}
+
+/**
+ * Continuous BG curve segment for one colour band.
+ * No points — the dots live on their own series. Linear connector so the drawn path matches
+ * the synthetic threshold crossings from [splitBgLineByBand].
+ */
+fun createBgBandLine(color: Color, strokeWidth: Dp): LineCartesianLayer.Line =
+    LineCartesianLayer.Line(
+        fill = LineCartesianLayer.LineFill.single(Fill(color)),
+        stroke = LineCartesianLayer.LineStroke.Continuous(thickness = strokeWidth, cap = StrokeCap.Round),
+        areaFill = null,
+        pointProvider = LineCartesianLayer.PointProvider.single(
+            LineCartesianLayer.Point(
+                component = ShapeComponent(fill = Fill(Color.Transparent), shape = CircleShape),
+                size = 0.dp,
+            )
+        ),
+        interpolator = Linear,
+    )
+
+/**
+ * Soft area fill under the full BG curve. Same fading-downward pattern as the IOB/COB graphs.
+ * Stroke is invisible — the coloured line lives on the band series.
+ */
+fun createBgAreaFillLine(
+    wash: Color,
+    topAlpha: Float,
+    bottomAlpha: Float,
+): LineCartesianLayer.Line =
+    LineCartesianLayer.Line(
+        fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
+        stroke = LineCartesianLayer.LineStroke.Continuous(thickness = 0.dp),
+        areaFill = LineCartesianLayer.AreaFill.single(
+            Fill(
+                Brush.verticalGradient(
+                    listOf(
+                        wash.copy(alpha = topAlpha),
+                        wash.copy(alpha = bottomAlpha),
+                    )
+                )
+            )
+        ),
+        pointProvider = LineCartesianLayer.PointProvider.single(
+            LineCartesianLayer.Point(
+                component = ShapeComponent(fill = Fill(Color.Transparent), shape = CircleShape),
+                size = 0.dp,
+            )
+        ),
+        interpolator = Linear,
+    )
+
+/**
+ * Soft tinted horizontal band between [yLow] and [yHigh] (chart Y units).
+ *
+ * Maps Y through the live chart ranges (same as Vico's `HorizontalBox`), so it works with both
+ * a fixed Y axis and Overview's auto Y axis. Drawn **under** the layers so the BG curve and
+ * dots stay crisp on top of the wash.
+ */
+class TargetRangeBandDecoration(
     private val yLow: Double,
     private val yHigh: Double,
-    private val bgAxisMinY: Double,
-    private val bgAxisMaxY: Double,
     private val fillColor: Color,
-    private val fillAlpha: Float = 0.085f,
+    private val cornerRadius: Dp,
 ) : Decoration {
 
-    override fun drawOverLayers(context: CartesianDrawingContext) {
-        if (bgAxisMaxY <= bgAxisMinY) return
-        val lo = minOf(yLow, yHigh).coerceIn(bgAxisMinY, bgAxisMaxY)
-        val hi = maxOf(yLow, yHigh).coerceIn(bgAxisMinY, bgAxisMaxY)
+    override fun drawUnderLayers(context: CartesianDrawingContext) {
+        val lo = minOf(yLow, yHigh)
+        val hi = maxOf(yLow, yHigh)
         if (hi <= lo) return
         with(context) {
-            val span = bgAxisMaxY - bgAxisMinY
-            fun glucoseYToCanvas(y: Double): Float {
-                val t = ((y - bgAxisMinY) / span).toFloat().coerceIn(0f, 1f)
-                return layerBounds.bottom - t * layerBounds.height
-            }
+            val yRange = ranges.getYRange(Axis.Position.Vertical.Start)
+            if (yRange.length <= 0.0) return
+            fun glucoseYToCanvas(y: Double): Float =
+                layerBounds.bottom - ((y - yRange.minY) / yRange.length).toFloat() * layerBounds.height
             val topY = glucoseYToCanvas(hi)
             val bottomY = glucoseYToCanvas(lo)
-            val rectTop = minOf(topY, bottomY)
-            val h = (bottomY - rectTop).coerceAtLeast(2f)
+            val rectTop = minOf(topY, bottomY).coerceIn(layerBounds.top, layerBounds.bottom)
+            val rectBottom = maxOf(topY, bottomY).coerceIn(layerBounds.top, layerBounds.bottom)
+            val h = rectBottom - rectTop
+            if (h <= 0f) return
+            val radiusPx = cornerRadius.pixels
             with(mutableDrawScope) {
                 drawRoundRect(
-                    color = fillColor.copy(alpha = fillAlpha),
+                    color = fillColor,
                     topLeft = Offset(layerBounds.left, rectTop),
                     size = Size((layerBounds.right - layerBounds.left).coerceAtLeast(1f), h),
-                    cornerRadius = CornerRadius(10f, 10f),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx),
                 )
             }
         }
@@ -413,45 +740,311 @@ class TargetComfortCorridorDecoration(
 
     override fun equals(other: Any?): Boolean =
         this === other ||
-            other is TargetComfortCorridorDecoration &&
+            other is TargetRangeBandDecoration &&
             yLow == other.yLow &&
             yHigh == other.yHigh &&
-            bgAxisMinY == other.bgAxisMinY &&
-            bgAxisMaxY == other.bgAxisMaxY &&
             fillColor == other.fillColor &&
-            fillAlpha == other.fillAlpha
+            cornerRadius == other.cornerRadius
 
     override fun hashCode(): Int {
         var result = yLow.hashCode()
         result = 31 * result + yHigh.hashCode()
-        result = 31 * result + bgAxisMinY.hashCode()
-        result = 31 * result + bgAxisMaxY.hashCode()
         result = 31 * result + fillColor.hashCode()
-        result = 31 * result + fillAlpha.hashCode()
+        result = 31 * result + cornerRadius.hashCode()
         return result
     }
 }
 
 @Composable
-fun rememberTargetComfortCorridorDecoration(
-    corridor: Pair<Double, Double>?,
-    bgAxisMinY: Double,
-    bgAxisMaxY: Double,
+fun rememberTargetRangeBandDecoration(
+    yRange: Pair<Double, Double>?,
     fillColor: Color,
-    fillAlpha: Float = 0.085f,
-): TargetComfortCorridorDecoration? {
-    return remember(corridor, bgAxisMinY, bgAxisMaxY, fillColor, fillAlpha) {
-        val c = corridor
-        if (c == null || bgAxisMaxY <= bgAxisMinY || c.second <= c.first) {
+    cornerRadius: Dp,
+): TargetRangeBandDecoration? {
+    return remember(yRange, fillColor, cornerRadius) {
+        if (yRange == null || yRange.second <= yRange.first) {
             null
         } else {
-            TargetComfortCorridorDecoration(
-                yLow = c.first,
-                yHigh = c.second,
-                bgAxisMinY = bgAxisMinY,
-                bgAxisMaxY = bgAxisMaxY,
+            TargetRangeBandDecoration(
+                yLow = yRange.first,
+                yHigh = yRange.second,
                 fillColor = fillColor,
-                fillAlpha = fillAlpha,
+                cornerRadius = cornerRadius,
+            )
+        }
+    }
+}
+
+/**
+ * One SMB marker in chart space, with the source timestamp so a tap can map back to the bolus.
+ */
+data class SmbMarkerPoint(
+    val timestampEpochMs: Long,
+    val x: Double,
+    val y: Double,
+)
+
+/**
+ * Canvas position of a drawn SMB triangle, plus its timestamp. Written from
+ * [SmbMarkersDecoration] on every draw pass and read on tap for hit testing.
+ */
+data class SmbCanvasHit(
+    val canvasX: Float,
+    val canvasY: Float,
+    val timestampEpochMs: Long,
+)
+
+/**
+ * Plain holder for the latest drawn SMB canvas positions. Same rules as [VisibleRangeHolder]:
+ * not Compose state, written from the draw phase, polled on tap.
+ */
+class SmbHitPositionHolder {
+    @Volatile
+    var points: List<SmbCanvasHit> = emptyList()
+}
+
+/**
+ * Nearest drawn SMB triangle within [radiusPx] of the tap, or null.
+ * Uses squared distance — no sqrt. Pure — easy to unit-test.
+ */
+fun findSmbCanvasHit(
+    hits: List<SmbCanvasHit>,
+    tapX: Float,
+    tapY: Float,
+    radiusPx: Float,
+): SmbCanvasHit? {
+    if (hits.isEmpty() || radiusPx <= 0f) return null
+    val maxDistSq = radiusPx * radiusPx
+    var best: SmbCanvasHit? = null
+    var bestDistSq = Float.POSITIVE_INFINITY
+    for (hit in hits) {
+        val dx = hit.canvasX - tapX
+        val dy = hit.canvasY - tapY
+        val distSq = dx * dx + dy * dy
+        if (distSq <= maxDistSq && distSq < bestDistSq) {
+            bestDistSq = distSq
+            best = hit
+        }
+    }
+    return best
+}
+
+/**
+ * SMB markers drawn in the over-layers so they sit above basal, the BG curve and the grid.
+ *
+ * The matching line series stays in the chart model as a hit target only (invisible points).
+ * The triangle matches [TriangleShape]: apex at the top of the size box, base at the data point's y.
+ * Each drawn triangle's canvas position is recorded into [hitHolder] so taps can hit the shape
+ * the user sees, not only Vico's nearest model-X key.
+ */
+class SmbMarkersDecoration(
+    private val points: List<SmbMarkerPoint>,
+    private val color: Color,
+    private val outlineColor: Color,
+    private val size: Dp,
+    private val strokeWidth: Dp,
+    private val hitHolder: SmbHitPositionHolder? = null,
+) : Decoration {
+
+    override fun drawOverLayers(context: CartesianDrawingContext) {
+        if (points.isEmpty()) {
+            hitHolder?.points = emptyList()
+            return
+        }
+        val yRange = context.ranges.getYRange(Axis.Position.Vertical.Start)
+        if (yRange.length <= 0.0) {
+            hitHolder?.points = emptyList()
+            return
+        }
+        val sizePx = with(context) { size.pixels }
+        val strokePx = with(context) { strokeWidth.pixels }
+        val half = sizePx / 2f
+        val baseHalf = sizePx * 0.3f
+        val hits = if (hitHolder != null) ArrayList<SmbCanvasHit>(points.size) else null
+        with(context.mutableDrawScope) {
+            for (point in points) {
+                val canvasX = context.dataXToCanvasX(point.x)
+                if (canvasX < context.layerBounds.left - half || canvasX > context.layerBounds.right + half) continue
+                val canvasY =
+                    context.layerBounds.bottom -
+                        ((point.y - yRange.minY) / yRange.length).toFloat() * context.layerBounds.height
+                // Hit centre is the middle of the triangle box (apex at canvasY - half, base at canvasY).
+                hits?.add(
+                    SmbCanvasHit(
+                        canvasX = canvasX,
+                        canvasY = canvasY - half / 2f,
+                        timestampEpochMs = point.timestampEpochMs,
+                    )
+                )
+                val path = Path().apply {
+                    moveTo(canvasX, canvasY - half)
+                    lineTo(canvasX + baseHalf, canvasY)
+                    lineTo(canvasX - baseHalf, canvasY)
+                    close()
+                }
+                drawPath(path, color = color)
+                if (strokePx > 0f && outlineColor.alpha > 0f) {
+                    drawPath(path, color = outlineColor, style = Stroke(width = strokePx))
+                }
+            }
+        }
+        hitHolder?.points = hits.orEmpty()
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is SmbMarkersDecoration &&
+            points == other.points &&
+            color == other.color &&
+            outlineColor == other.outlineColor &&
+            size == other.size &&
+            strokeWidth == other.strokeWidth &&
+            hitHolder === other.hitHolder
+
+    override fun hashCode(): Int {
+        var result = points.hashCode()
+        result = 31 * result + color.hashCode()
+        result = 31 * result + outlineColor.hashCode()
+        result = 31 * result + size.hashCode()
+        result = 31 * result + strokeWidth.hashCode()
+        result = 31 * result + (hitHolder?.hashCode() ?: 0)
+        return result
+    }
+}
+
+/**
+ * Remember a [SmbMarkersDecoration] for the given chart-space points.
+ * @param points SMB markers; empty draws nothing
+ * @param hitHolder receives drawn canvas positions for tap hit testing (optional)
+ */
+@Composable
+fun rememberSmbMarkers(
+    points: List<SmbMarkerPoint>,
+    color: Color,
+    outlineColor: Color,
+    size: Dp,
+    strokeWidth: Dp,
+    hitHolder: SmbHitPositionHolder? = null,
+): SmbMarkersDecoration? {
+    return remember(points, color, outlineColor, size, strokeWidth, hitHolder) {
+        if (points.isEmpty()) {
+            // Decoration is dropped, so clear the hit list here — otherwise a tap could hit a
+            // triangle that is no longer on screen.
+            hitHolder?.points = emptyList()
+            null
+        } else {
+            SmbMarkersDecoration(points, color, outlineColor, size, strokeWidth, hitHolder)
+        }
+    }
+}
+
+/**
+ * Soft highlight for the current (latest) BG reading: a translucent halo under the point
+ * and a thin ring around it, so "now" stands out from the historical dots.
+ *
+ * The halo sits under the layers (so the curve still reads on top); the ring sits over them.
+ * Y is mapped through the live start-axis range, so it tracks Overview auto-Y and the
+ * dashboard fixed range alike.
+ */
+class CurrentBgHighlightDecoration(
+    private val x: Double,
+    private val y: Double,
+    private val glowColor: Color,
+    private val glowRadius: Dp,
+    private val glowAlpha: Float,
+    private val ringColor: Color,
+    private val ringRadius: Dp,
+    private val ringWidth: Dp,
+) : Decoration {
+
+    private fun CartesianDrawingContext.center(): Offset? {
+        val yRange = ranges.getYRange(Axis.Position.Vertical.Start)
+        if (yRange.length <= 0.0) return null
+        val canvasX = dataXToCanvasX(x)
+        if (canvasX < layerBounds.left - 8f || canvasX > layerBounds.right + 8f) return null
+        val canvasY =
+            layerBounds.bottom - ((y - yRange.minY) / yRange.length).toFloat() * layerBounds.height
+        return Offset(canvasX, canvasY)
+    }
+
+    override fun drawUnderLayers(context: CartesianDrawingContext) {
+        if (glowAlpha <= 0f || glowRadius <= 0.dp) return
+        val center = with(context) { center() } ?: return
+        val radiusPx = with(context) { glowRadius.pixels }
+        with(context.mutableDrawScope) {
+            drawCircle(
+                color = glowColor.copy(alpha = glowAlpha),
+                radius = radiusPx,
+                center = center,
+            )
+        }
+    }
+
+    override fun drawOverLayers(context: CartesianDrawingContext) {
+        if (ringRadius <= 0.dp || ringWidth <= 0.dp) return
+        val center = with(context) { center() } ?: return
+        val radiusPx = with(context) { ringRadius.pixels }
+        val widthPx = with(context) { ringWidth.pixels }
+        with(context.mutableDrawScope) {
+            drawCircle(
+                color = ringColor,
+                radius = radiusPx,
+                center = center,
+                style = Stroke(width = widthPx),
+            )
+        }
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is CurrentBgHighlightDecoration &&
+            x == other.x &&
+            y == other.y &&
+            glowColor == other.glowColor &&
+            glowRadius == other.glowRadius &&
+            glowAlpha == other.glowAlpha &&
+            ringColor == other.ringColor &&
+            ringRadius == other.ringRadius &&
+            ringWidth == other.ringWidth
+
+    override fun hashCode(): Int {
+        var result = x.hashCode()
+        result = 31 * result + y.hashCode()
+        result = 31 * result + glowColor.hashCode()
+        result = 31 * result + glowRadius.hashCode()
+        result = 31 * result + glowAlpha.hashCode()
+        result = 31 * result + ringColor.hashCode()
+        result = 31 * result + ringRadius.hashCode()
+        result = 31 * result + ringWidth.hashCode()
+        return result
+    }
+}
+
+/**
+ * Remember a [CurrentBgHighlightDecoration] for the latest BG reading.
+ * @param point chart-space `(x, y)` of the current reading, or null to draw nothing
+ */
+@Composable
+fun rememberCurrentBgHighlight(
+    point: Pair<Double, Double>?,
+    glowColor: Color,
+    glowRadius: Dp,
+    glowAlpha: Float,
+    ringColor: Color,
+    ringRadius: Dp,
+    ringWidth: Dp,
+): CurrentBgHighlightDecoration? {
+    return remember(point, glowColor, glowRadius, glowAlpha, ringColor, ringRadius, ringWidth) {
+        point?.let { (x, y) ->
+            CurrentBgHighlightDecoration(
+                x = x,
+                y = y,
+                glowColor = glowColor,
+                glowRadius = glowRadius,
+                glowAlpha = glowAlpha,
+                ringColor = ringColor,
+                ringRadius = ringRadius,
+                ringWidth = ringWidth,
             )
         }
     }
@@ -459,21 +1052,29 @@ fun rememberTargetComfortCorridorDecoration(
 
 /**
  * "Now" vertical dotted line decoration for Vico charts.
- * Draws a dotted vertical line at the current time position across the full chart height.
- * Shared across all graphs (BG, IOB, COB, Treatment Belt) for consistent "now" indication.
+ * Draws a dotted vertical line at the current time position across the full chart height,
+ * with a soft glow behind it. Shared across all graphs (BG, IOB, COB, Treatment Belt) for
+ * consistent "now" indication.
+ *
+ * The glow is two wide translucent strokes under the dashed core. That is the portable way to
+ * get a soft halo in Compose canvas — no blur filter needed.
  *
  * @param nowX The x-value for "now" (minutes from minTimestamp, via [timestampToX])
  * @param color The line color
- * @param strokeWidthPx Line stroke width in pixels
- * @param dashLengthPx Dash segment length in pixels
- * @param gapLengthPx Gap between dashes in pixels
+ * @param strokeWidth Stroke width of the dashed core
+ * @param dashLength Dash segment length
+ * @param gapLength Gap between dashes
+ * @param glowWidth Stroke width of the soft glow (0 = no glow)
+ * @param glowAlpha Glow alpha, as a multiplier on [color]'s own alpha
  */
 class NowLine(
     private val nowX: Double,
     private val color: Color,
-    private val strokeWidthPx: Float = 2f,
-    private val dashLengthPx: Float = 6f,
-    private val gapLengthPx: Float = 4f
+    private val strokeWidth: Dp = 2.dp,
+    private val dashLength: Dp = 6.dp,
+    private val gapLength: Dp = 4.dp,
+    private val glowWidth: Dp = 0.dp,
+    private val glowAlpha: Float = 0f,
 ) : Decoration {
 
     override fun drawOverLayers(context: CartesianDrawingContext) {
@@ -482,15 +1083,33 @@ class NowLine(
             if (xStep == 0.0) return
 
             // Convert x-value to canvas coordinate (mirrors Vico's internal getDrawX logic)
-            val canvasX = layerBounds.left +
-                layerDimensions.startPadding +
-                layerDimensions.xSpacing * ((nowX - ranges.minX) / xStep).toFloat() -
-                scroll
+            val canvasX = dataXToCanvasX(nowX)
 
             // Skip if outside visible area
             if (canvasX < layerBounds.left || canvasX > layerBounds.right) return
 
+            val strokeWidthPx = strokeWidth.pixels
+            val dashLengthPx = dashLength.pixels
+            val gapLengthPx = gapLength.pixels
+            val glowWidthPx = glowWidth.pixels
+
             with(mutableDrawScope) {
+                if (glowWidthPx > 0f && glowAlpha > 0f) {
+                    val baseAlpha = color.alpha * glowAlpha
+                    // Outer then inner: a cheap two-step falloff that reads as a soft halo.
+                    drawLine(
+                        color = color.copy(alpha = baseAlpha),
+                        start = Offset(canvasX, layerBounds.top),
+                        end = Offset(canvasX, layerBounds.bottom),
+                        strokeWidth = glowWidthPx,
+                    )
+                    drawLine(
+                        color = color.copy(alpha = (baseAlpha * 1.8f).coerceAtMost(1f)),
+                        start = Offset(canvasX, layerBounds.top),
+                        end = Offset(canvasX, layerBounds.bottom),
+                        strokeWidth = glowWidthPx * 0.45f,
+                    )
+                }
                 drawLine(
                     color = this@NowLine.color,
                     start = Offset(canvasX, layerBounds.top),
@@ -509,24 +1128,40 @@ class NowLine(
             other is NowLine &&
             nowX == other.nowX &&
             color == other.color &&
-            strokeWidthPx == other.strokeWidthPx
+            strokeWidth == other.strokeWidth &&
+            glowWidth == other.glowWidth &&
+            glowAlpha == other.glowAlpha
 
     override fun hashCode(): Int {
         var result = nowX.hashCode()
         result = 31 * result + color.hashCode()
-        result = 31 * result + strokeWidthPx.hashCode()
+        result = 31 * result + strokeWidth.hashCode()
+        result = 31 * result + glowWidth.hashCode()
+        result = 31 * result + glowAlpha.hashCode()
         return result
     }
 }
 
 /**
  * Remember a [NowLine] decoration for the current time.
+ * Stroke and glow metrics come from [chartStyle] so Light and Dark can diverge.
  * @param nowTimestamp current time in millis — pass a ticker value so the line updates periodically
  */
 @Composable
-fun rememberNowLine(minTimestamp: Long, nowTimestamp: Long, color: Color): NowLine {
-    return remember(minTimestamp, nowTimestamp, color) {
-        NowLine(nowX = timestampToX(nowTimestamp, minTimestamp), color = color)
+fun rememberNowLine(
+    minTimestamp: Long,
+    nowTimestamp: Long,
+    color: Color,
+    chartStyle: ChartStyle = AapsTheme.chartStyle,
+): NowLine {
+    return remember(minTimestamp, nowTimestamp, color, chartStyle) {
+        NowLine(
+            nowX = timestampToX(nowTimestamp, minTimestamp),
+            color = color,
+            strokeWidth = chartStyle.nowLineStrokeWidth,
+            glowWidth = chartStyle.nowLineGlowWidth,
+            glowAlpha = chartStyle.nowLineGlowAlpha,
+        )
     }
 }
 

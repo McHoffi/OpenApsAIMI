@@ -38,3 +38,28 @@ val Square: LineCartesianLayer.Interpolator = object : LineCartesianLayer.Interp
         }
     }
 }
+
+/**
+ * Straight line between data points (no smoothing).
+ *
+ * Used for the BG curve so colour-band splits at the threshold crossings sit exactly on the
+ * drawn path. A smoothed interpolator would bow away from those synthetic points and the
+ * colour would change slightly off the threshold.
+ */
+val Linear: LineCartesianLayer.Interpolator = object : LineCartesianLayer.Interpolator {
+    override fun interpolate(
+        context: CartesianDrawingContext,
+        path: Path,
+        points: List<Offset>,
+        visibleIndexRange: IntRange
+    ) {
+        for (index in visibleIndexRange) {
+            val point = points[index]
+            if (index == visibleIndexRange.first) {
+                path.moveTo(point.x, point.y)
+            } else {
+                path.lineTo(point.x, point.y)
+            }
+        }
+    }
+}

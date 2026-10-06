@@ -45,6 +45,8 @@ data class ElementColors(
     val navigation: Color,          // history browser, setup wizard, maintenance, configuration
     // Graph overlay colors (no ElementType)
     val activity: Color,
+    /** Graph-only colour for SMB and bolus markers. Distinct from [tempBasal]. */
+    val smbMarker: Color,
     // Running mode belt graph background colors (no ElementType)
     val loopClosed: Color,
     val loopOpened: Color,
@@ -95,6 +97,7 @@ val LightElementColors = ElementColors(
     navigation = Color(0xFF607D8B),       // blue-grey 500
     // Graph overlay colors
     activity = Color(0xFFD3F166),         // activity — yellow-green
+    smbMarker = Color(0xFF4A148C),        // strong deep violet — SMB + bolus markers, distinct from tempBasal cyan
     // Running mode belt graph background colors
     loopClosed = Color(0xFF4CAF50),       // green — normal operating state
     loopOpened = Color(0xFF4983D7),       // blue
@@ -145,6 +148,7 @@ val DarkElementColors = ElementColors(
     navigation = Color(0xFF90A4AE),       // blue-grey 300 (night)
     // Graph overlay colors
     activity = Color(0xFFD3F166),         // activity — yellow-green
+    smbMarker = Color(0xFFB388FF),        // strong vivid violet — SMB + bolus markers, distinct from tempBasal cyan
     // Running mode belt graph background colors
     loopClosed = Color(0xFF4CAF50),       // green — normal operating state
     loopOpened = Color(0xFF4983D7),       // blue

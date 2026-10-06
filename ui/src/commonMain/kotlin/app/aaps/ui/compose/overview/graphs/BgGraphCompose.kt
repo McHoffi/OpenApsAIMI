@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -135,7 +136,7 @@ private class MutableYRangeProvider(
 /**
  * BG Graph using Vico — dual-layer chart.
  *
- * Layer 0 (start axis): BG readings — regular (outlined circles) + bucketed (filled, range-colored)
+ * Layer 0 (start axis): BG readings — subtle neutral dots plus a continuous curve coloured by range
  * Layer 1 (end axis, hidden): Basal — profile (dashed step) + actual delivered (solid step + area fill)
  *
  * **BG start-axis Y** follows legacy [app.aaps.core.graph.data.GlucoseValueDataPoint] / GraphView:
@@ -210,16 +211,18 @@ fun BgGraphCompose(
     val activityData by viewModel.activityGraphFlow.collectAsStateWithLifecycle()
     val showBolus = SeriesType.BOLUS in bgOverlays
     val treatmentData by viewModel.treatmentGraphFlow.collectAsStateWithLifecycle()
-    val smbColor = AapsTheme.elementColors.insulin
+    val smbColor = AapsTheme.elementColors.smbMarker
     val chartConfig by viewModel.chartConfigFlow.collectAsStateWithLifecycle()
     val generalUnits by viewModel.generalUnits.collectAsStateWithLifecycle()
     val vicoChartLook by viewModel.vicoChartLookFlow.collectAsStateWithLifecycle()
     val glass = LocalOverviewGlass.current
+    val chartStyle = AapsTheme.chartStyle
     // Glass draws the chart over a translucent gradient. The classic guideline color is too faint
     // there, so use the stronger outline color to keep the grid visible.
     val guidelineColor =
-        if (glass.enabled) MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
-        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        if (glass.enabled) MaterialTheme.colorScheme.outline.copy(alpha = chartStyle.glassGridAlpha)
+        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = chartStyle.gridAlpha)
+    val axisLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = chartStyle.axisLabelAlpha)
 
     // Y-axis matches legacy GraphView: display units (mg/dL or mmol/L per General → Units).
     // [BgDataPoint.value] / target line / DB remain mg/dL; convert at Vico series build.
@@ -270,6 +273,17 @@ fun BgGraphCompose(
     val uamPredColor = AapsTheme.generalColors.uamPrediction
     val ztPredColor = AapsTheme.generalColors.ztPrediction
 
+    // Shared fade window for prediction lines: full alpha at the first prediction point,
+    // lowest alpha at the last. All series use the same window so they fade together.
+    val predictionFadeWindow = remember(predictions, minTimestamp) {
+        if (predictions.isEmpty()) {
+            null
+        } else {
+            val xs = predictions.map { timestampToX(it.timestamp, minTimestamp) }
+            xs.min() to xs.max()
+        }
+    }
+
     // Calculate x-axis range (must match COB graph for alignment)
     val maxX = remember(minTimestamp, maxTimestamp) {
         timestampToX(maxTimestamp, minTimestamp)
@@ -282,8 +296,8 @@ fun BgGraphCompose(
     //     MutableYRangeProvider(maxX = maxX, minY = initialScale.min, maxY = initialScale.max, yStep = initialScale.step)
     // }
 
-    // Track which series are currently included (for matching LineProvider)
-    val activeSeriesState = remember { mutableStateOf(listOf<String>()) }
+    // Track which BG-layer lines to emit (area fill, band runs, dots, SMB, predictions)
+    val bgLinePlanState = remember { mutableStateOf(BgLinePlan()) }
 
     // Stable time range - only changes when timestamps change by more than 1 minute
     val stableTimeRange = remember(minTimestamp / 60000, maxTimestamp / 60000) {
@@ -318,48 +332,75 @@ fun BgGraphCompose(
         modelProducer.runTransaction {
             // Block 1 → BG layer (layer 0, start axis)
             lineModel {
-                val activeSeries = mutableListOf<String>()
+                var hasAreaFill = false
+                val bandRuns = mutableListOf<BgBand>()
+                var hasRegularDots = false
+                var hasBucketedDots = false
+                var hasSmb = false
+                val predictionIds = mutableListOf<String>()
 
-                if (regularPoints.isNotEmpty()) {
-                    val dataPoints = regularPoints
+                fun toSortedPoints(source: List<BgDataPoint>): List<Pair<Double, Double>> =
+                    source
                         .map { timestampToX(it.timestamp, minTimestamp) to viewModel.glucoseMgdlToChartY(it.value) }
                         .sortedBy { it.first }
+
+                // Continuous BG curve: bucketed (smoothed) when present, else raw readings.
+                val lineSource = toSortedPoints(
+                    if (bucketedPoints.isNotEmpty()) bucketedPoints else regularPoints
+                )
+                val veryHighY = viewModel.glucoseMgdlToChartY(VERY_HIGH_BG_MGDL)
+
+                if (lineSource.size >= 2) {
+                    // Soft area under the whole curve (not split by band).
+                    series(x = lineSource.map { it.first }, y = lineSource.map { it.second })
+                    hasAreaFill = true
+
+                    // Coloured curve, one series per band run so the colour changes at the thresholds.
+                    for (run in splitBgLineByBand(lineSource, currentLowMark, currentHighMark, veryHighY)) {
+                        series(x = run.points.map { it.first }, y = run.points.map { it.second })
+                        bandRuns.add(run.band)
+                    }
+                }
+
+                if (regularPoints.isNotEmpty()) {
+                    val dataPoints = toSortedPoints(regularPoints)
                     series(x = dataPoints.map { it.first }, y = dataPoints.map { it.second })
-                    activeSeries.add(SERIES_REGULAR)
+                    hasRegularDots = true
                 }
 
                 if (bucketedPoints.isNotEmpty()) {
-                    val dataPoints = bucketedPoints
-                        .map { timestampToX(it.timestamp, minTimestamp) to viewModel.glucoseMgdlToChartY(it.value) }
-                        .sortedBy { it.first }
+                    val dataPoints = toSortedPoints(bucketedPoints)
                     series(x = dataPoints.map { it.first }, y = dataPoints.map { it.second })
-                    activeSeries.add(SERIES_BUCKETED)
+                    hasBucketedDots = true
                 }
 
                 if (smbPoints.isNotEmpty()) {
-                    val dataPoints = smbPoints
-                        .map { timestampToX(it.timestamp, minTimestamp) to viewModel.glucoseMgdlToChartY(it.value) }
-                        .sortedBy { it.first }
+                    val dataPoints = toSortedPoints(smbPoints)
                     series(x = dataPoints.map { it.first }, y = dataPoints.map { it.second })
-                    activeSeries.add(SERIES_DASHBOARD_SMB)
+                    hasSmb = true
                 }
 
                 // Prediction series - each type as a separate line
                 for (predSeries in PREDICTION_SERIES) {
                     val predPoints = seriesRegistry[predSeries]
                     if (predPoints != null && predPoints.isNotEmpty()) {
-                        val dataPoints = predPoints
-                            .map { timestampToX(it.timestamp, minTimestamp) to viewModel.glucoseMgdlToChartY(it.value) }
-                            .sortedBy { it.first }
+                        val dataPoints = toSortedPoints(predPoints)
                         series(x = dataPoints.map { it.first }, y = dataPoints.map { it.second })
-                        activeSeries.add(predSeries)
+                        predictionIds.add(predSeries)
                     }
                 }
 
                 // Normalizer series
                 series(x = normalizerX(maxX), y = NORMALIZER_Y)
 
-                activeSeriesState.value = activeSeries.toList()
+                bgLinePlanState.value = BgLinePlan(
+                    hasAreaFill = hasAreaFill,
+                    bandRuns = bandRuns.toList(),
+                    hasRegularDots = hasRegularDots,
+                    hasBucketedDots = hasBucketedDots,
+                    hasSmb = hasSmb,
+                    predictionIds = predictionIds.toList(),
+                )
             }
 
             // Block 2 → Basal layer (layer 1, end axis)
@@ -386,6 +427,7 @@ fun BgGraphCompose(
             }
 
             // Block 3 → Target line layer (layer 2, start axis)
+            // Only the live target value line. The low/high range is a soft band decoration.
             lineModel {
                 if (currentTargetData.targets.size >= 2) {
                     val pts = currentTargetData.targets
@@ -395,11 +437,6 @@ fun BgGraphCompose(
                 } else {
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                 }
-
-                val highY = viewModel.glucoseMgdlToChartY(currentHighMark)
-                val lowY  = viewModel.glucoseMgdlToChartY(currentLowMark)
-                series(x = listOf(0.0, maxX), y = listOf(highY, highY))  // high mark
-                series(x = listOf(0.0, maxX), y = listOf(lowY,  lowY))   // low mark
             }
 
             // Block 4 → EPS layer (layer 3, start axis — Y based on profile %, scaled into BG coordinate space)
@@ -546,11 +583,6 @@ fun BgGraphCompose(
         rebuildChart(basalData, targetData, epsPoints, activityData,minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
     }
 
-    // Build lookup map for BUCKETED points: x-value -> BgDataPoint (for PointProvider)
-    val bucketedLookup = remember(bucketedData, minTimestamp) {
-        bucketedData.associateBy { timestampToX(it.timestamp, minTimestamp) }
-    }
-
     // Time formatter and axis configuration
     val timeFormatter = rememberTimeFormatter(minTimestamp)
     val bottomAxisItemPlacer = rememberBottomAxisItemPlacer(minTimestamp)
@@ -559,49 +591,60 @@ fun BgGraphCompose(
     // BG layer lines (layer 0)
     // =========================================================================
     val regularColorChart = if (dashboardSoftTherapyVisuals) regularColor.copy(alpha = 0.88f) else regularColor
-    val regularOutlineAlpha = if (dashboardSoftTherapyVisuals) 0.22f else 0.3f
     val customTintDots = vicoChartLook.bgReadingTintKey != VicoChartAppearance.TINT_THEME
-    // Bucketed series is drawn on top of regular; keep in-range fill aligned with reading tint pref.
-    val bucketedInRangeColor = if (customTintDots) regularColorChart else inRangeColor
-    val bucketedPointProvider = remember(bucketedLookup, lowColor, bucketedInRangeColor, highColor) {
-        BucketedPointProvider(bucketedLookup, lowColor, bucketedInRangeColor, highColor)
-    }
     val regularDotFillAlpha = if (customTintDots) {
-        if (dashboardSoftTherapyVisuals) 0.38f else 0.52f
+        if (dashboardSoftTherapyVisuals) 0.38f else chartStyle.bgPointFillAlpha
     } else {
-        0f
+        chartStyle.bgPointFillAlpha
     }
 
-    val regularLine = remember(regularColorChart, regularOutlineAlpha, regularDotFillAlpha) {
+    // Subtle neutral dots. Range colouring lives on the continuous line only.
+    val regularLine = remember(
+        regularColorChart,
+        chartStyle.bgPointStrokeAlpha,
+        regularDotFillAlpha,
+        chartStyle.bgPointSize,
+    ) {
         LineCartesianLayer.Line(
             fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
             areaFill = null,
             pointProvider = LineCartesianLayer.PointProvider.single(
                 LineCartesianLayer.Point(
                     component = ShapeComponent(
-                        fill = Fill(
-                            if (regularDotFillAlpha > 0f) {
-                                regularColorChart.copy(alpha = regularDotFillAlpha)
-                            } else {
-                                Color.Transparent
-                            },
-                        ),
+                        fill = Fill(regularColorChart.copy(alpha = regularDotFillAlpha)),
                         shape = CircleShape,
-                        strokeFill = Fill(regularColorChart.copy(alpha = regularOutlineAlpha)),
+                        strokeFill = Fill(regularColorChart.copy(alpha = chartStyle.bgPointStrokeAlpha)),
                         strokeThickness = 1.dp
                     ),
-                    size = 6.dp
+                    size = chartStyle.bgPointSize
                 )
             )
         )
     }
 
-    val bucketedLine = remember(bucketedPointProvider) {
-        LineCartesianLayer.Line(
-            fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
-            areaFill = null,
-            pointProvider = bucketedPointProvider
+    // Continuous BG curve: one coloured run per band, plus a soft fading area under the whole line.
+    // Low and very high share the red band colour ("tief = rot", "sehr hoch = rot").
+    val bgAreaFillLine = remember(inRangeColor, chartStyle.bgLineFillTopAlpha, chartStyle.bgLineFillBottomAlpha) {
+        createBgAreaFillLine(
+            wash = inRangeColor,
+            topAlpha = chartStyle.bgLineFillTopAlpha,
+            bottomAlpha = chartStyle.bgLineFillBottomAlpha,
         )
+    }
+    val bgBandLineLow = remember(lowColor, chartStyle.bgLineStrokeWidth) {
+        createBgBandLine(lowColor, chartStyle.bgLineStrokeWidth)
+    }
+    val bgBandLineTarget = remember(inRangeColor, chartStyle.bgLineStrokeWidth) {
+        createBgBandLine(inRangeColor, chartStyle.bgLineStrokeWidth)
+    }
+    val bgBandLineHigh = remember(highColor, chartStyle.bgLineStrokeWidth) {
+        createBgBandLine(highColor, chartStyle.bgLineStrokeWidth)
+    }
+    fun bgBandLineFor(band: BgBand): LineCartesianLayer.Line = when (band) {
+        BgBand.LOW       -> bgBandLineLow
+        BgBand.TARGET    -> bgBandLineTarget
+        BgBand.HIGH      -> bgBandLineHigh
+        BgBand.VERY_HIGH -> bgBandLineLow
     }
 
     val smbFillResolved = if (dashboardSoftTherapyVisuals) {
@@ -616,19 +659,15 @@ fun BgGraphCompose(
     }
     val smbPointSize = if (dashboardSoftTherapyVisuals) 9.dp else 11.dp
     val smbStrokeThickness = if (dashboardSoftTherapyVisuals) 1.dp else 2.dp
-    val smbDashboardLine = remember(smbFillResolved, smbStrokeResolved, smbPointSize, smbStrokeThickness) {
+    // Hit target only: the visible triangles are drawn by [SmbMarkersDecoration] over the layers.
+    val smbDashboardLine = remember {
         LineCartesianLayer.Line(
             fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
             areaFill = null,
             pointProvider = LineCartesianLayer.PointProvider.single(
                 LineCartesianLayer.Point(
-                    component = ShapeComponent(
-                        fill = Fill(smbFillResolved),
-                        shape = TriangleShape,
-                        strokeFill = Fill(smbStrokeResolved),
-                        strokeThickness = smbStrokeThickness
-                    ),
-                    size = smbPointSize
+                    component = ShapeComponent(fill = Fill(Color.Transparent), shape = TriangleShape),
+                    size = 0.dp
                 )
             )
         )
@@ -649,20 +688,22 @@ fun BgGraphCompose(
         dashboardSoftTherapyVisuals,
         surfaceForBlend,
         useScenarioProjectionLines,
+        chartStyle,
+        predictionFadeWindow,
     ) {
         when {
             useScenarioProjectionLines -> createScenarioFloorLine(scenarioFloorColor, scenarioPointHalo)
             dashboardSoftTherapyVisuals -> createSoftPredictionLine(softenChartColor(iobPredColor, surfaceForBlend))
-            else -> createPredictionLine(iobPredColor)
+            else -> createPredictionLine(iobPredColor, chartStyle, predictionFadeWindow)
         }
     }
-    val cobPredLine = remember(cobPredColor, dashboardSoftTherapyVisuals, surfaceForBlend) {
+    val cobPredLine = remember(cobPredColor, dashboardSoftTherapyVisuals, surfaceForBlend, chartStyle, predictionFadeWindow) {
         val c = if (dashboardSoftTherapyVisuals) softenChartColor(cobPredColor, surfaceForBlend) else cobPredColor
-        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c)
+        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c, chartStyle, predictionFadeWindow)
     }
-    val aCobPredLine = remember(aCobPredColor, dashboardSoftTherapyVisuals, surfaceForBlend) {
+    val aCobPredLine = remember(aCobPredColor, dashboardSoftTherapyVisuals, surfaceForBlend, chartStyle, predictionFadeWindow) {
         val c = if (dashboardSoftTherapyVisuals) softenChartColor(aCobPredColor, surfaceForBlend) else aCobPredColor
-        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c)
+        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c, chartStyle, predictionFadeWindow)
     }
     val uamPredLine = remember(
         scenarioBestColor,
@@ -670,28 +711,47 @@ fun BgGraphCompose(
         dashboardSoftTherapyVisuals,
         surfaceForBlend,
         useScenarioProjectionLines,
+        chartStyle,
+        predictionFadeWindow,
     ) {
         when {
             useScenarioProjectionLines -> createScenarioBestLine(scenarioBestColor, scenarioPointHalo)
             dashboardSoftTherapyVisuals -> createSoftPredictionLine(softenChartColor(uamPredColor, surfaceForBlend))
-            else -> createPredictionLine(uamPredColor)
+            else -> createPredictionLine(uamPredColor, chartStyle, predictionFadeWindow)
         }
     }
-    val ztPredLine = remember(ztPredColor, dashboardSoftTherapyVisuals, surfaceForBlend) {
+    val ztPredLine = remember(ztPredColor, dashboardSoftTherapyVisuals, surfaceForBlend, chartStyle, predictionFadeWindow) {
         val c = if (dashboardSoftTherapyVisuals) softenChartColor(ztPredColor, surfaceForBlend) else ztPredColor
-        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c)
+        if (dashboardSoftTherapyVisuals) createSoftPredictionLine(c) else createPredictionLine(c, chartStyle, predictionFadeWindow)
     }
-    val activeSeries by activeSeriesState
-    val bgLines = remember(activeSeries, regularLine, bucketedLine, smbDashboardLine, iobPredLine, cobPredLine, aCobPredLine, uamPredLine, ztPredLine, normalizerLine) {
+    val bgLinePlan by bgLinePlanState
+    val bgLines = remember(
+        bgLinePlan,
+        bgAreaFillLine,
+        bgBandLineLow,
+        bgBandLineTarget,
+        bgBandLineHigh,
+        regularLine,
+        smbDashboardLine,
+        iobPredLine,
+        cobPredLine,
+        aCobPredLine,
+        uamPredLine,
+        ztPredLine,
+        normalizerLine,
+    ) {
+        val plan = bgLinePlan
         buildList {
-            if (SERIES_REGULAR in activeSeries) add(regularLine)
-            if (SERIES_BUCKETED in activeSeries) add(bucketedLine)
-            if (SERIES_DASHBOARD_SMB in activeSeries) add(smbDashboardLine)
-            if (SERIES_PRED_IOB in activeSeries) add(iobPredLine)
-            if (SERIES_PRED_COB in activeSeries) add(cobPredLine)
-            if (SERIES_PRED_ACOB in activeSeries) add(aCobPredLine)
-            if (SERIES_PRED_UAM in activeSeries) add(uamPredLine)
-            if (SERIES_PRED_ZT in activeSeries) add(ztPredLine)
+            if (plan.hasAreaFill) add(bgAreaFillLine)
+            for (band in plan.bandRuns) add(bgBandLineFor(band))
+            if (plan.hasRegularDots) add(regularLine)
+            if (plan.hasBucketedDots) add(regularLine)
+            if (plan.hasSmb) add(smbDashboardLine)
+            if (SERIES_PRED_IOB in plan.predictionIds) add(iobPredLine)
+            if (SERIES_PRED_COB in plan.predictionIds) add(cobPredLine)
+            if (SERIES_PRED_ACOB in plan.predictionIds) add(aCobPredLine)
+            if (SERIES_PRED_UAM in plan.predictionIds) add(uamPredLine)
+            if (SERIES_PRED_ZT in plan.predictionIds) add(ztPredLine)
             add(normalizerLine)
         }
     }
@@ -743,30 +803,7 @@ fun BgGraphCompose(
         )
     }
 
-    //val targetLines = remember(targetLine) { listOf(targetLine) }
-
-    val highMarkLine = remember {
-        LineCartesianLayer.Line(
-            fill = LineCartesianLayer.LineFill.single(Fill(highColor.copy(alpha = 0.7f))),
-            stroke = LineCartesianLayer.LineStroke.Dashed(
-                thickness = 1.dp, cap = StrokeCap.Round, dashLength = 4.dp, gapLength = 4.dp
-            ),
-            areaFill = null
-        )
-    }
-    val lowMarkLine = remember {
-        LineCartesianLayer.Line(
-            fill = LineCartesianLayer.LineFill.single(Fill(lowColor.copy(alpha = 0.7f))),
-            stroke = LineCartesianLayer.LineStroke.Dashed(
-                thickness = 1.dp, cap = StrokeCap.Round, dashLength = 4.dp, gapLength = 4.dp
-            ),
-            areaFill = null
-        )
-    }
-
-    val targetLines = remember(targetLine, highMarkLine, lowMarkLine) {
-        listOf(targetLine, highMarkLine, lowMarkLine)
-    }
+    val targetLines = remember(targetLine) { listOf(targetLine) }
 
     // =========================================================================
     // EPS layer lines (layer 3) — profile icon points
@@ -822,19 +859,10 @@ fun BgGraphCompose(
         listOf(activityHistLine, activityPredLine)
     }
 
-    val smbLine = remember(smbColor) {
-        LineCartesianLayer.Line(
-            fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
-            areaFill = null,
-            pointProvider = LineCartesianLayer.PointProvider.single(
-                LineCartesianLayer.Point(
-                    component = ShapeComponent(fill = Fill(smbColor), shape = TriangleShape),
-                    size = 13.dp
-                )
-            )
-        )
-    }
-    val smbLineInvisible = remember {
+    // Outline keeps the marker readable on top of the basal wash and the BG curve.
+    val markerOutlineColor = MaterialTheme.colorScheme.onSurface
+    // Hit target only: the visible triangles are drawn by [SmbMarkersDecoration] over the layers.
+    val smbLine = remember {
         LineCartesianLayer.Line(
             fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
             areaFill = null,
@@ -846,9 +874,7 @@ fun BgGraphCompose(
             )
         )
     }
-    val smbLines = remember(smbLine, smbLineInvisible, showBolus) {
-        listOf(if (showBolus) smbLine else smbLineInvisible)
-    }
+    val smbLines = remember(smbLine) { listOf(smbLine) }
 
     // Basal Y-axis range: maxBasal * 4 so basal occupies ~25% of chart height
     // EPS layer shares End axis with basal, so both must use the same Y-range (basalMaxY)
@@ -865,7 +891,93 @@ fun BgGraphCompose(
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    val nowLine = rememberNowLine(minTimestamp, nowTimestamp, nowLineColor)
+    val nowLine = rememberNowLine(minTimestamp, nowTimestamp, nowLineColor, chartStyle)
+
+    // Highlight the current (latest) BG reading: halo + ring, coloured by its BG band.
+    val currentBgPoint = remember(bgReadings, bucketedData, minTimestamp) {
+        val source = if (bucketedData.isNotEmpty()) bucketedData else bgReadings
+        val latest = source.maxByOrNull { it.timestamp } ?: return@remember null
+        val chartY = viewModel.glucoseMgdlToChartY(latest.value)
+        timestampToX(latest.timestamp, minTimestamp) to chartY
+    }
+    val currentBgHighlightColor = remember(currentBgPoint, chartConfig, lowColor, inRangeColor, highColor) {
+        val point = currentBgPoint ?: return@remember lowColor
+        val veryHighY = viewModel.glucoseMgdlToChartY(VERY_HIGH_BG_MGDL)
+        bgBandColor(
+            band = bgBandOf(point.second, chartConfig.lowMark, chartConfig.highMark, veryHighY),
+            low = lowColor,
+            target = inRangeColor,
+            high = highColor,
+        )
+    }
+    val currentBgHighlight = rememberCurrentBgHighlight(
+        point = currentBgPoint,
+        glowColor = currentBgHighlightColor,
+        glowRadius = chartStyle.currentBgGlowRadius,
+        glowAlpha = chartStyle.currentBgGlowAlpha,
+        ringColor = currentBgHighlightColor,
+        ringRadius = chartStyle.currentBgRingRadius,
+        ringWidth = chartStyle.currentBgRingWidth,
+    )
+    // Visible SMB triangles live in the over-layers so they sit above basal, the BG curve and the grid.
+    // The matching line series stays in the model as a tap hit target (invisible points).
+    // Drawn triangle positions are recorded here so taps can hit the shape the user sees.
+    val overviewSmbHits = remember { SmbHitPositionHolder() }
+    val dashboardSmbHits = remember { SmbHitPositionHolder() }
+    val overviewSmbPoints = remember(treatmentData, showBolus, minTimestamp, maxX, chartConfig) {
+        if (!showBolus) {
+            emptyList()
+        } else {
+            treatmentData.boluses
+                .filter { it.isValid && it.bolusType == BolusType.SMB }
+                .map { it.timestamp to timestampToX(it.timestamp, minTimestamp) }
+                .filter { (_, x) -> x in 0.0..maxX }
+                .map { (timestamp, x) ->
+                    SmbMarkerPoint(timestampEpochMs = timestamp, x = x, y = chartConfig.lowMark)
+                }
+        }
+    }
+    val overviewSmbDecoration = rememberSmbMarkers(
+        points = overviewSmbPoints,
+        color = smbColor,
+        outlineColor = markerOutlineColor,
+        size = chartStyle.smbMarkerSize,
+        strokeWidth = chartStyle.smbMarkerStrokeWidth,
+        hitHolder = overviewSmbHits,
+    )
+    val dashboardSmbPoints = remember(
+        dashboardSmbMarkers,
+        bgReadings,
+        minTimestamp,
+        dashboardSplitActivityToStrip,
+        chartConfig,
+        generalUnits,
+    ) {
+        if (dashboardSplitActivityToStrip) {
+            emptyList()
+        } else {
+            val sortedBgAsc = bgReadings.sortedBy { it.timestamp }
+            val fallbackMgdl = viewModel.glucoseDisplayYToMgdl(
+                (chartConfig.lowMark + chartConfig.highMark) / 2.0,
+            )
+            dashboardSmbMarkers.map { m ->
+                val mgdl = interpolateBgForDashboardMarker(m.timestampEpochMs, sortedBgAsc, fallbackMgdl)
+                SmbMarkerPoint(
+                    timestampEpochMs = m.timestampEpochMs,
+                    x = timestampToX(m.timestampEpochMs, minTimestamp),
+                    y = viewModel.glucoseMgdlToChartY(mgdl),
+                )
+            }
+        }
+    }
+    val dashboardSmbDecoration = rememberSmbMarkers(
+        points = dashboardSmbPoints,
+        color = smbFillResolved,
+        outlineColor = smbStrokeResolved,
+        size = smbPointSize,
+        strokeWidth = smbStrokeThickness,
+        hitHolder = dashboardSmbHits,
+    )
     val tbrLaneWash = if (dashboardSoftTherapyVisuals) scheme.surfaceContainerHighest else scheme.tertiary.copy(alpha = 0.78f)
     val tbrBarHalo = if (dashboardSoftTherapyVisuals) scheme.outlineVariant else scheme.tertiary.copy(alpha = 0.78f)
     val tbrBarCore = if (dashboardSoftTherapyVisuals) scheme.secondary else scheme.tertiary.copy(alpha = 0.78f)
@@ -883,18 +995,15 @@ fun BgGraphCompose(
         markerLineColor = tbrMarkerLine,
         softStyle = dashboardSoftTherapyVisuals,
     )
-    val comfortCorridorPair =
-        if (dashboardSoftTherapyVisuals && lockStartAxisYFromZero && chartConfig.lowMark < chartConfig.highMark) {
+    // Soft tinted target-range band (low mark .. high mark). Replaces the old hard dashed marks.
+    val targetRangeBandDecoration = rememberTargetRangeBandDecoration(
+        yRange = if (chartConfig.lowMark < chartConfig.highMark) {
             chartConfig.lowMark to chartConfig.highMark
         } else {
             null
-        }
-    val comfortCorridorDecoration = rememberTargetComfortCorridorDecoration(
-        corridor = comfortCorridorPair,
-        bgAxisMinY = 0.0,
-        bgAxisMaxY = startAxisMaxY,
-        fillColor = scheme.secondaryContainer,
-        fillAlpha = 0.095f,
+        },
+        fillColor = AapsTheme.generalColors.bgTargetRangeArea,
+        cornerRadius = chartStyle.targetBandCorner,
     )
     val scenarioGeometry = remember(
         predictions,
@@ -918,22 +1027,37 @@ fun BgGraphCompose(
         terminalGlowColor = scenarioBestColor,
     )
 
-    val decorations = remember(comfortCorridorDecoration, scenarioDecorations, tbrDecoration, nowLine) {
+    val decorations = remember(
+        targetRangeBandDecoration,
+        scenarioDecorations,
+        tbrDecoration,
+        currentBgHighlight,
+        overviewSmbDecoration,
+        dashboardSmbDecoration,
+        nowLine,
+    ) {
         buildList {
-            comfortCorridorDecoration?.let { add(it) }
+            targetRangeBandDecoration?.let { add(it) }
+            currentBgHighlight?.let { add(it) }
             addAll(scenarioDecorations)
             tbrDecoration?.let { add(it) }
             add(nowLine)
+            overviewSmbDecoration?.let { add(it) }
+            dashboardSmbDecoration?.let { add(it) }
         }
     }
 
     val defaultMarkerController = CartesianMarkerController.rememberShowOnPress()
+    val smbTouchRadiusPx = with(LocalDensity.current) { chartStyle.smbMarkerTouchRadius.toPx() }
     val dashboardSmbTapController =
         remember(
             treatmentData,
             dashboardSmbMarkers,
             minTimestamp,
             dashboardSplitActivityToStrip,
+            overviewSmbHits,
+            dashboardSmbHits,
+            smbTouchRadiusPx,
         ) {
             if (dashboardSplitActivityToStrip) return@remember null
             val treatmentSmbBoluses = treatmentData.boluses.filter { it.isValid && it.bolusType == BolusType.SMB }
@@ -942,6 +1066,8 @@ fun BgGraphCompose(
                 smbs = dashboardSmbMarkers,
                 smbBoluses = treatmentSmbBoluses,
                 minTimestamp = minTimestamp,
+                hitHolders = listOf(overviewSmbHits, dashboardSmbHits),
+                touchRadiusPx = smbTouchRadiusPx,
                 onSmbTap = { smb ->
                     //Log.d("SMB_TAP", "Vico marker matched: ${smb.amountLabel}")
                     selectedSmb = treatmentData.boluses.firstOrNull {
@@ -1028,7 +1154,7 @@ fun BgGraphCompose(
             startAxis = VerticalAxis.rememberStart(
                 itemPlacer = VerticalAxis.ItemPlacer.step({ 1.0 }),
                 label = rememberTextComponent(
-                    style = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+                    style = TextStyle(color = axisLabelColor),
                     minWidth = TextComponent.MinWidth.fixed(30.dp)
                 ),
                 guideline = LineComponent(fill = Fill(guidelineColor))
@@ -1037,7 +1163,7 @@ fun BgGraphCompose(
                 valueFormatter = timeFormatter,
                 itemPlacer = bottomAxisItemPlacer,
                 label = rememberTextComponent(
-                    style = TextStyle(color = MaterialTheme.colorScheme.onSurface)
+                    style = TextStyle(color = axisLabelColor)
                 ),
                 guideline = LineComponent(fill = Fill(guidelineColor))
             ),
@@ -1075,7 +1201,7 @@ fun BgGraphCompose(
                     Text(
                         text = smb.label,
                         style = MaterialTheme.typography.titleMedium,
-                        color = AapsTheme.elementColors.insulin,
+                        color = AapsTheme.elementColors.smbMarker,
                     )
                     Text(
                         text = timeStr,
@@ -1165,16 +1291,23 @@ private fun rememberBgValueMarker(
 }
 
 /**
- * Matches [LineCartesianLayerMarkerTarget]s for the dashboard SMB series without duplicating
- * scroll/zoom → model-X math. Tapping an SMB point fires [onSmbTap] (a toast) and, per the Vico
- * contract for [shouldAcceptInteraction] (returning `false` only skips updating marker visibility for
- * that interaction — it does not hide an already-visible marker), leaves the value/time tooltip as it
- * was. Any other tap on the line falls through to the normal tooltip.
+ * Tapping an SMB triangle fires [onSmbTap] (the popup). Any other tap falls through to the normal
+ * value/time tooltip.
+ *
+ * Hit testing is two-step:
+ * 1. **2D circle around the drawn triangle** (positions recorded by `SmbMarkersDecoration`) with
+ *    radius [touchRadiusPx] — this is the main path, so the touch window matches what the user sees.
+ * 2. **Fallback** on Vico's nearest model-X targets, for a tap near an SMB that misses the shape.
+ *
+ * Per the Vico contract for [shouldAcceptInteraction], returning `false` only skips updating marker
+ * visibility for that interaction — it does not hide an already-visible marker.
  */
 private class DashboardSmbTapMarkerController(
     private val smbs: List<ChartSmbMarker>,
     private val smbBoluses: List<BolusGraphPoint>,
     private val minTimestamp: Long,
+    private val hitHolders: List<SmbHitPositionHolder>,
+    private val touchRadiusPx: Float,
     private val onSmbTap: (ChartSmbMarker) -> Unit,
 ) : CartesianMarkerController {
 
@@ -1189,38 +1322,55 @@ private class DashboardSmbTapMarkerController(
         interaction: Interaction,
         targets: List<CartesianMarker.Target>,
     ): Boolean {
-        if (interaction !is Interaction.Tap || targets.isEmpty()) return true
+        if (interaction !is Interaction.Tap) return true
         val tapX = interaction.point.x
+        val tapY = interaction.point.y
+
+        // 1) 2D hit on the drawn triangles (works even when Vico snaps to a neighbouring BG point).
         var bestSmb: ChartSmbMarker? = null
-        var bestDist = Float.POSITIVE_INFINITY
-        for (t in targets) {
-            if (t !is LineCartesianLayerMarkerTarget) continue
-            val smb = smbs.firstOrNull { smb ->
-                abs(timestampToX(smb.timestampEpochMs, minTimestamp) - t.x) < MODEL_X_MATCH_EPS
-            }
-            if (smb != null) {
-                val d = abs(t.canvasX - tapX)
-                if (d <= SMB_TAP_MAX_CANVAS_X_DIST_PX && d < bestDist) {
-                    bestDist = d
-                    bestSmb = smb
+        val canvasHit = findSmbCanvasHit(
+            hits = hitHolders.flatMap { it.points },
+            tapX = tapX,
+            tapY = tapY,
+            radiusPx = touchRadiusPx,
+        )
+        if (canvasHit != null) {
+            bestSmb = markerForTimestamp(canvasHit.timestampEpochMs)
+        }
+
+        // 2) Fallback: nearest model-X targets (old path).
+        if (bestSmb == null && targets.isNotEmpty()) {
+            var bestDist = Float.POSITIVE_INFINITY
+            for (t in targets) {
+                if (t !is LineCartesianLayerMarkerTarget) continue
+                val smb = smbs.minByOrNull { smb ->
+                    abs(timestampToX(smb.timestampEpochMs, minTimestamp) - t.x)
+                }?.takeIf { abs(timestampToX(it.timestampEpochMs, minTimestamp) - t.x) < MODEL_X_MATCH_EPS }
+                if (smb != null) {
+                    val d = abs(t.canvasX - tapX)
+                    if (d <= SMB_TAP_MAX_CANVAS_X_DIST_PX && d < bestDist) {
+                        bestDist = d
+                        bestSmb = smb
+                    }
+                    continue
                 }
-                continue
-            }
-            // Also match against treatment SMB boluses (the actual data source for Layer 5 triangles)
-            val bolus = smbBoluses.firstOrNull { b ->
-                abs(timestampToX(b.timestamp, minTimestamp) - t.x) < MODEL_X_MATCH_EPS
-            }
-            if (bolus != null) {
-                val d = abs(t.canvasX - tapX)
-                if (d <= SMB_TAP_MAX_CANVAS_X_DIST_PX && d < bestDist) {
-                    bestDist = d
-                    bestSmb = ChartSmbMarker(
-                        timestampEpochMs = bolus.timestamp,
-                        amountLabel = bolus.label,
-                    )
+                // Also match against treatment SMB boluses (the actual data source for Layer 5 triangles)
+                val bolus = smbBoluses.minByOrNull { b ->
+                    abs(timestampToX(b.timestamp, minTimestamp) - t.x)
+                }?.takeIf { abs(timestampToX(it.timestamp, minTimestamp) - t.x) < MODEL_X_MATCH_EPS }
+                if (bolus != null) {
+                    val d = abs(t.canvasX - tapX)
+                    if (d <= SMB_TAP_MAX_CANVAS_X_DIST_PX && d < bestDist) {
+                        bestDist = d
+                        bestSmb = ChartSmbMarker(
+                            timestampEpochMs = bolus.timestamp,
+                            amountLabel = bolus.label,
+                        )
+                    }
                 }
             }
         }
+
         lastTapWasSmb = bestSmb != null
         if (bestSmb != null) {
             onSmbTap(bestSmb)
@@ -1232,6 +1382,15 @@ private class DashboardSmbTapMarkerController(
 
     override fun shouldShowMarker(interaction: Interaction, targets: List<CartesianMarker.Target>): Boolean =
         !lastTapWasSmb
+
+    private fun markerForTimestamp(timestampEpochMs: Long): ChartSmbMarker? {
+        smbs.firstOrNull { it.timestampEpochMs == timestampEpochMs }?.let { return it }
+        val bolus = smbBoluses.firstOrNull { it.timestamp == timestampEpochMs } ?: return null
+        return ChartSmbMarker(
+            timestampEpochMs = bolus.timestamp,
+            amountLabel = bolus.label,
+        )
+    }
 
     private companion object {
         private const val MODEL_X_MATCH_EPS = 0.02

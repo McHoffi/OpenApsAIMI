@@ -232,6 +232,18 @@ object AapsTheme {
      * @see AapsSpacing for available values
      */
     val spacing: AapsSpacing get() = AapsSpacing
+
+    /**
+     * Chart presentation metrics (stroke widths, point sizes, alphas) for the Vico graphs.
+     *
+     * Automatically adapts to light/dark mode based on current theme.
+     *
+     * @see ChartStyle for available values
+     */
+    val chartStyle: ChartStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalChartStyle.current
 }
 
 /**
@@ -291,6 +303,7 @@ fun AapsTheme(
     val treatmentIconColors = if (isDark) DarkElementColors else LightElementColors
     val generalColors = if (isDark) DarkGeneralColors else LightGeneralColors
     val snackbarColors = if (isDark) DarkSnackbarColors else LightSnackbarColors
+    val chartStyle = if (isDark) DarkChartStyle else LightChartStyle
 
     // Scale typography up on tablets. Orientation-independent (smallest-width signal).
     val isTablet = smallestScreenWidthDp() >= TABLET_MIN_SW_DP
@@ -302,6 +315,7 @@ fun AapsTheme(
         LocalElementColors provides treatmentIconColors,
         LocalGeneralColors provides generalColors,
         LocalSnackbarColors provides snackbarColors,
+        LocalChartStyle provides chartStyle,
         LocalAapsScale provides typographyScale,
     ) {
         MaterialTheme(

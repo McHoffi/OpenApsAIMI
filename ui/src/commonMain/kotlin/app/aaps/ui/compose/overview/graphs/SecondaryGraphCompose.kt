@@ -776,14 +776,16 @@ fun SecondaryGraphCompose(
     val timeFormatter = rememberTimeFormatter(minTimestamp)
     val bottomAxisItemPlacer = rememberBottomAxisItemPlacer(minTimestamp)
     val nowLineColor = MaterialTheme.colorScheme.onSurface
-    val nowLine = rememberNowLine(minTimestamp, nowTimestamp, nowLineColor)
+    val chartStyle = AapsTheme.chartStyle
+    val nowLine = rememberNowLine(minTimestamp, nowTimestamp, nowLineColor, chartStyle)
     val decorations = remember(nowLine, visibleRangeReporter) { listOf(nowLine, visibleRangeReporter) }
     val glass = LocalOverviewGlass.current
     // Glass draws the chart over a translucent gradient. The classic guideline color is too faint
     // there, so use the stronger outline color to keep the grid visible.
     val guidelineColor =
-        if (glass.enabled) MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
-        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        if (glass.enabled) MaterialTheme.colorScheme.outline.copy(alpha = chartStyle.glassGridAlpha)
+        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = chartStyle.gridAlpha)
+    val axisLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = chartStyle.axisLabelAlpha)
 
     // Union of Y values across all primary-layer series (IOB, COB, simple series, DevSlope-min,
     // deviation lines), windowed to the visible scroll/zoom range — computed once here since the
@@ -1035,7 +1037,7 @@ fun SecondaryGraphCompose(
     val startAxis = VerticalAxis.rememberStart(
         itemPlacer = startAxisItemPlacer,
         label = rememberTextComponent(
-            style = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+            style = TextStyle(color = axisLabelColor),
             minWidth = TextComponent.MinWidth.fixed(30.dp)
         ),
         guideline = LineComponent(fill = Fill(guidelineColor)),
@@ -1045,7 +1047,7 @@ fun SecondaryGraphCompose(
         valueFormatter = timeFormatter,
         itemPlacer = bottomAxisItemPlacer,
         label = rememberTextComponent(
-            style = TextStyle(color = MaterialTheme.colorScheme.onSurface)
+            style = TextStyle(color = axisLabelColor)
         ),
         guideline = LineComponent(fill = Fill(guidelineColor))
     )
@@ -1545,9 +1547,11 @@ data class IobLineStyles(
 
 @Composable
 fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
-    val iobColor = AapsTheme.generalColors.iobPrediction
-    val smbColor = AapsTheme.elementColors.insulin
+    val chartStyle = AapsTheme.chartStyle
+    val iobColor = AapsTheme.generalColors.iobChart
+    val smbColor = AapsTheme.elementColors.smbMarker
     val extBolusColor = AapsTheme.elementColors.extendedBolus
+    val markerOutlineColor = MaterialTheme.colorScheme.onSurface
     val decimalFormatter = LocalDecimalFormatter.current
 
     val bolusLabelComponent = remember(smbColor) {
@@ -1565,7 +1569,11 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
 
     return remember(
         iobColor,
+        chartStyle.seriesAreaFillTopAlpha,
+        chartStyle.seriesAreaFillBottomAlpha,
+        chartStyle.smbMarkerStrokeWidth,
         smbColor,
+        markerOutlineColor,
         extBolusColor,
         bolusLabelComponent,
         bolusValueFormatter,
@@ -1577,7 +1585,14 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
             iobLine = LineCartesianLayer.Line(
                 fill = LineCartesianLayer.LineFill.single(Fill(iobColor)),
                 areaFill = LineCartesianLayer.AreaFill.single(
-                    Fill(Brush.verticalGradient(listOf(iobColor.copy(alpha = 1f), Color.Transparent)))
+                    Fill(
+                        Brush.verticalGradient(
+                            listOf(
+                                iobColor.copy(alpha = chartStyle.seriesAreaFillTopAlpha),
+                                iobColor.copy(alpha = chartStyle.seriesAreaFillBottomAlpha),
+                            )
+                        )
+                    )
                 ),
                 interpolator = Square
             ),
@@ -1585,28 +1600,60 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
                 fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
                 areaFill = null,
                 pointProvider = LineCartesianLayer.PointProvider.single(
-                    LineCartesianLayer.Point(component = ShapeComponent(fill = Fill(smbColor), shape = TriangleShape), size = 10.dp)
+                    LineCartesianLayer.Point(
+                        component = ShapeComponent(
+                            fill = Fill(smbColor),
+                            shape = TriangleShape,
+                            strokeFill = Fill(markerOutlineColor),
+                            strokeThickness = chartStyle.smbMarkerStrokeWidth,
+                        ),
+                        size = 10.dp,
+                    )
                 )
             ),
             mediumSmbLine = LineCartesianLayer.Line(
                 fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
                 areaFill = null,
                 pointProvider = LineCartesianLayer.PointProvider.single(
-                    LineCartesianLayer.Point(component = ShapeComponent(fill = Fill(smbColor), shape = TriangleShape), size = 16.dp)
+                    LineCartesianLayer.Point(
+                        component = ShapeComponent(
+                            fill = Fill(smbColor),
+                            shape = TriangleShape,
+                            strokeFill = Fill(markerOutlineColor),
+                            strokeThickness = chartStyle.smbMarkerStrokeWidth,
+                        ),
+                        size = 16.dp,
+                    )
                 )
             ),
             largeSmbLine = LineCartesianLayer.Line(
                 fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
                 areaFill = null,
                 pointProvider = LineCartesianLayer.PointProvider.single(
-                    LineCartesianLayer.Point(component = ShapeComponent(fill = Fill(smbColor), shape = TriangleShape), size = 22.dp)
+                    LineCartesianLayer.Point(
+                        component = ShapeComponent(
+                            fill = Fill(smbColor),
+                            shape = TriangleShape,
+                            strokeFill = Fill(markerOutlineColor),
+                            strokeThickness = chartStyle.smbMarkerStrokeWidth,
+                        ),
+                        size = 22.dp,
+                    )
                 )
             ),
             bolusLine = LineCartesianLayer.Line(
                 fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
                 areaFill = null,
                 pointProvider = LineCartesianLayer.PointProvider.single(
-                    LineCartesianLayer.Point(component = ShapeComponent(fill = Fill(smbColor), shape = InvertedTriangleShape), size = 22.dp)
+                    LineCartesianLayer.Point(
+                        component = ShapeComponent(
+                            fill = Fill(smbColor),
+                            shape = InvertedTriangleShape,
+                            strokeFill = Fill(markerOutlineColor),
+                            strokeThickness = chartStyle.smbMarkerStrokeWidth,
+                        ),
+                        size = 22.dp,
+                    )
                 ),
                 dataLabel = if (showPointDataLabels) bolusLabelComponent else null,
                 dataLabelPosition = Position.Vertical.Top,
@@ -1635,7 +1682,8 @@ data class CobLineStyles(
 
 @Composable
 fun rememberCobLineStyles(showPointDataLabels: Boolean): CobLineStyles {
-    val cobColor = AapsTheme.generalColors.cobPrediction
+    val chartStyle = AapsTheme.chartStyle
+    val cobColor = AapsTheme.generalColors.cobChart
     val carbsColor = AapsTheme.elementColors.carbs
     val decimalFormatter = LocalDecimalFormatter.current
 
@@ -1646,12 +1694,27 @@ fun rememberCobLineStyles(showPointDataLabels: Boolean): CobLineStyles {
         CartesianValueFormatter { _, value, _ -> formatCarbsLabel(value, decimalFormatter) }
     }
 
-    return remember(cobColor, carbsColor, carbsLabelComponent, carbsValueFormatter, showPointDataLabels) {
+    return remember(
+        cobColor,
+        chartStyle.seriesAreaFillTopAlpha,
+        chartStyle.seriesAreaFillBottomAlpha,
+        carbsColor,
+        carbsLabelComponent,
+        carbsValueFormatter,
+        showPointDataLabels,
+    ) {
         CobLineStyles(
             cobLine = LineCartesianLayer.Line(
                 fill = LineCartesianLayer.LineFill.single(Fill(cobColor)),
                 areaFill = LineCartesianLayer.AreaFill.single(
-                    Fill(Brush.verticalGradient(listOf(cobColor.copy(alpha = 1f), Color.Transparent)))
+                    Fill(
+                        Brush.verticalGradient(
+                            listOf(
+                                cobColor.copy(alpha = chartStyle.seriesAreaFillTopAlpha),
+                                cobColor.copy(alpha = chartStyle.seriesAreaFillBottomAlpha),
+                            )
+                        )
+                    )
                 ),
                 interpolator = AdaptiveStep
             ),
