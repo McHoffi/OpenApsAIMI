@@ -104,7 +104,6 @@ class DexcomOnePlusPlugin @Inject constructor(
         }
         .icon(IcPluginByoda)
         .pluginName(TextRef.AndroidRes(R.string.dexcom_oneplus_native))
-        .shortName(TextRef.AndroidRes(R.string.dexcom_oneplus_short))
         .preferencesVisibleInSimpleMode(false)
         // ONE+ is only offered when the engineering marker file is present - see
         // DexcomOnePlusAvailabilityProvider. Hiding here removes ONE+ from Config Builder, the

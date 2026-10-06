@@ -37,6 +37,7 @@ import app.aaps.core.interfaces.rx.events.EventAppExit
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.utils.waitMillis
 import app.aaps.core.validators.preferences.AdaptiveDoublePreference
@@ -84,9 +85,8 @@ class ApexPumpPlugin @Inject constructor(
         .mainType(PluginType.PUMP)
         .fragmentClass(ApexFragment::class.java.name)
         .icon(IcPatchPump)
-        .pluginName(R.string.apex_plugin_name)
-        .shortName(R.string.apex_plugin_shortname)
-        .description(R.string.apex_plugin_description),
+        .pluginName(TextRef.AndroidRes(R.string.apex_plugin_name))
+        .description(TextRef.AndroidRes(R.string.apex_plugin_description)),
     emptyList(),
     aapsLogger,
     rh,

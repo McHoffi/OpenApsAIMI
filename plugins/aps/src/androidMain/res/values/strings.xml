@@ -18,7 +18,6 @@
     <string name="description_auto_isf">Most recent algorithm for advanced users with AutoISF extensions</string>
     <!-- Boost Plugin -->
     <string name="openaps_boost">Boost</string>
-    <string name="boost_shortname">BOOST</string>
     <string name="description_boost">Boost based accelerated bolusing with dynamic ISF</string>
     <string name="openaps_boost_v2">Boost V2</string>
     <string name="boost_v2_shortname">BOOST2</string>
@@ -242,7 +241,6 @@
 
     <string name="activity_monitor_title">Activity Monitor</string>
     <string name="activity_monitor_summary">Activity is detected in form of steps as measured by the phone. It does not replace an explicit sport adjustment but is a lower level complement.</string>
-    <string name="oaps_aimi_shortname">AIMI</string>
     <string name="openapsaimi">"AIMI 3.3"</string>
     <string name="openapsaimi_maxsmb_title">Max SMB LOW BG</string>
     <string name="description_openapsaimi">AIMI loop: adaptive PK/PD, Autodrive V3, physiological assistant (Health Connect + 28-pattern catalogue), optional Recursive Belief Tree (RBT/HTR), and unified hypo-risk alarms. Native Eversense E3/365 and standard CGM sources supported.</string>
@@ -1547,7 +1545,6 @@
 
     <!-- BOOST algorithm -->
     <string name="openaps_boost_v6">OpenAPS BOOST V6</string>
-    <string name="boost_v6_shortname">BOOST V6</string>
     <string name="description_boost_v6">BOOST V6 Observe-Confirm-Commit dosing pipeline with meal hypothesis state machine</string>
 
     <!-- AIMI meal mode settings screen -->

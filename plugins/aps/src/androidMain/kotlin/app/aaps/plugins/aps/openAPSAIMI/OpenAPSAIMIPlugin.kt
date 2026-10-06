@@ -253,7 +253,6 @@ open class OpenAPSAIMIPlugin  @Inject constructor(
         }
         .icon(IcPluginOpenAPS)
         .pluginName(ApsStrings.openapsaimi)
-        .shortName(ApsStrings.oaps_aimi_shortname)
         .preferencesVisibleInSimpleMode(false)
         .showInList({ config.APS })
         .description(ApsStrings.description_openapsaimi)

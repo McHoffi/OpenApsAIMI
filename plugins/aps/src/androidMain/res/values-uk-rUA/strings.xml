@@ -37,7 +37,6 @@
 
     <string name="openapsaimi">"AIMI 3.3"</string>
     <string name="description_openapsaimi">Small micro boluses based on Artificial Intelligence and Machine Learning.</string>
-    <string name="oaps_aimi_shortname">OpenApsAIMI</string>
     <string name="user_preferences">Global User Preferences</string>
     <string name="training_ml_modes_preferences">Training ML and Modes</string>
     <string name="autodrive_preferences">Autodrive settings</string>

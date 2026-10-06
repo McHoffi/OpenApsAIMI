@@ -76,7 +76,6 @@ class AdaptiveSmoothingPlugin @Inject constructor(
         .mainType(PluginType.SMOOTHING)
         .icon(IcStats)
         .pluginName(SmoothingStrings.adaptive_smoothing_name)
-        .shortName(SmoothingStrings.smoothing_shortname)
         .description(SmoothingStrings.description_adaptive_smoothing),
     aapsLogger, rh, notificationManager
 ), Smoothing {

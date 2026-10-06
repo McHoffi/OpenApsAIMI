@@ -1,7 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="apex_plugin_name">APEX TruCare III</string>
-    <string name="apex_plugin_shortname">APEX</string>
     <string name="apex_plugin_description">Native integration with APEX TruCare III insulin pump</string>
     <string name="apex_settings">APEX Pump Settings</string>
 

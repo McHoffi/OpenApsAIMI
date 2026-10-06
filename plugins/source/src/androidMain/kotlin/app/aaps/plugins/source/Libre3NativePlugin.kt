@@ -102,7 +102,6 @@ class Libre3NativePlugin @Inject constructor(
         }
         .icon(IcPluginByoda)
         .pluginName(TextRef.AndroidRes(R.string.libre3_native))
-        .shortName(TextRef.AndroidRes(R.string.libre3_short))
         .preferencesVisibleInSimpleMode(false)
         // Libre 3 native is only offered when the engineering marker file is present - see
         // Libre3AvailabilityProvider. Hiding here removes the plugin from Config Builder, the

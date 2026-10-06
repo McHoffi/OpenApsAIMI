@@ -111,7 +111,6 @@
     <string name="a11y_bg_outdated">outdated</string>
 
 
-    <string name="overview_shortname">HOME</string>
     <string name="description_overview">Displays the current state of your loop and buttons for most common actions</string>
     <string name="overview_buttons_selection">Buttons</string>
     <string name="dashboard_metrics_mode_simple">Simple</string>

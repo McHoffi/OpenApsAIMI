@@ -8,7 +8,6 @@
     <string name="dexcom_app_patched">BYODA</string>
     <string name="description_source_dexcom">Receive BG values from the \'Build Your Own Dexcom App\'.</string>
     <string name="dexcom_oneplus_native">Dexcom ONE+ / G7</string>
-    <string name="dexcom_oneplus_short">ONE+/G7</string>
     <string name="description_source_dexcom_oneplus_native">Native Dexcom ONE+ and G7 Bluetooth in AAPS. Apply the sensor, enter the pairing code immediately, then wait ~30 min warm-up before loop glucose.</string>
     <string name="dexcom_oneplus_plugin_summary">Status, connect with pairing code, and warm-up</string>
     <string name="dexcom_oneplus_aaps_directory_access_lost">Access to the AAPS folder has been lost. Open Maintenance, select the Documents/AAPS folder and grant permission again.</string>
@@ -210,7 +209,6 @@
 
     <!-- Libre 3 / Libre 3 Plus native BLE source -->
     <string name="libre3_native">Libre 3 / Libre 3 Plus</string>
-    <string name="libre3_short">Libre3</string>
     <string name="description_source_libre3_native">Native Libre 3 and Libre 3 Plus Bluetooth in AAPS. Scan the sensor once with NFC, then wait about 60 minutes of warm-up before loop glucose.</string>
     <string name="libre3_plugin_summary">Status, sensor start by NFC, and warm-up</string>
     <string name="libre3_aaps_directory_access_lost">Access to the AAPS folder has been lost. Open Maintenance, select the Documents/AAPS folder and grant permission again.</string>

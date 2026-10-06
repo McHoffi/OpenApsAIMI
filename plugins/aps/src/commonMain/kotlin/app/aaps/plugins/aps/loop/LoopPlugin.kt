@@ -878,7 +878,7 @@ class LoopPlugin(
                     // Take back an open loop suggestion shown before the pause, on the phone and on
                     // the watch. It cannot be accepted any more (#5192), so it must not be offered.
                     if (allowNotification) dismissSuggestion()
-                    return@withContext
+                    return
                 }
                 // Store reasons
                 closedLoopEnabled = constraintChecker.isClosedLoopAllowed()

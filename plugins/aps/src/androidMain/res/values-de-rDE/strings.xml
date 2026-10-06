@@ -165,7 +165,6 @@
     <string name="openapsama_smb_delivery_ratio_bg_range_summary">Standardwert: 0. Das linear ansteigende SMB-Abgabeverhältnis wird dem Glukosebereich [Ziel-BZ, Ziel-BZ+BZ_Bereich] zugeordnet.\nBei Ziel-BZ ist das SMB-Verhältnis smb_delivery_ratio_min, bei Ziel-BZ+BZ_Bereich ist es smb_delivery_ratio_max.\nMit 0 ist das linear ansteigende SMB-Verhältnis deaktiviert und das feste smb_delivery_ratio wird verwendet.</string>
     <string name="openapsama_smb_max_range_extension_summary">Standardwert: 1. Dies ist eine weitere wichtige OpenAPS-Sicherheitsgrenze und legt fest, um welchen Faktor die regulären 120 maxSMB/maxUAM Minuten überschritten werden dürfen. Erhöhen Sie diesen experimentellen Wert langsam und vorsichtig.</string>
     <string name="openapsama_iob_threshold_percent_summary" formatted="false">Prozentsatz des maxIOB, ab dem SMBs deaktiviert werden.\nStandardwert: 100 %\nBei 100 % ist diese Funktion effektiv deaktiviert.</string>
-    <string name="oaps_aimi_shortname">AIMI</string>
     <string name="openapsaimi">"AIMI 3.3"</string>
     <!-- keep english version for data analyis of AI
     <string name="description_openapsaimi">Kleine Mikroboli basierend auf Künstlicher Intelligenz und Maschinellem Lernen.</string>

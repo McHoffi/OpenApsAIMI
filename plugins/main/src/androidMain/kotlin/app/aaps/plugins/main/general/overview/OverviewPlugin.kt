@@ -90,7 +90,6 @@ class OverviewPlugin @Inject constructor(
         .simpleModePosition(PluginDescription.Position.TAB)
         .icon(IcPluginOverview)
         .pluginName(TextRef.AndroidRes(app.aaps.core.ui.R.string.overview))
-        .shortName(TextRef.AndroidRes(R.string.overview_shortname))
         .description(TextRef.AndroidRes(R.string.description_overview)),
     ownPreferences = OverviewStringKey.entries,
     aapsLogger, rh, preferences, notificationManager

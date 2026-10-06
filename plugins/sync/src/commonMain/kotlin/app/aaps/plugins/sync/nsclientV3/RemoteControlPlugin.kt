@@ -39,7 +39,6 @@ class RemoteControlPlugin @Inject constructor(
         .fragmentClass("app.aaps.plugins.sync.nsclientV3.RemoteControlFragment")
         .icon(Icons.Default.Home)
         .pluginName(SyncStrings.remote_control_title)
-        .shortName(SyncStrings.remote_control_title)
         .showInList { config.AAPSCLIENT }  // Only show in AAPSClient
         .enforceEnabledOnlyWhen { config.AAPSCLIENT }  // Only enable in AAPSClient
         .description(SyncStrings.remote_control_description),

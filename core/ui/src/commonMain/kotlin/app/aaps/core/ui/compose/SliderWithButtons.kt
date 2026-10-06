@@ -265,7 +265,7 @@ fun SliderWithButtons(
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.End,
                     modifier = Modifier
-                        .widthIn(min = if (asDuration || valueFormat != null || resolvedUnitLabel.isNotEmpty()) 70.dp else 40.dp)
+                        .widthIn(min = if (asDuration || unitFormat != null || resolvedUnitLabel.isNotEmpty()) 70.dp else 40.dp)
                         .then(if (enabled) Modifier.clickable { showDialog = true } else Modifier)
                         .padding(start = 4.dp)
                 )

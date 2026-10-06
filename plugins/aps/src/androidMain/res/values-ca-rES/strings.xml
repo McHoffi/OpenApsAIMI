@@ -76,7 +76,6 @@
     <string name="openapsama_smb_delivery_ratio_bg_range_summary">Default value: 0. The linearly increasing SMB delivery ratio is mapped to the glucose range [target_bg, target_bg+bg_range].\nAt target_bg the SMB ratio is smb_delivery_ratio_min, at target_bg+bg_range it is smb_delivery_ratio_max\nWith 0 the linearly increasing SMB ratio is disabled and the fixed smb_delivery_ratio is used.</string>
     <string name="openapsama_smb_max_range_extension_summary">Default value: 1 This is another key OpenAPS safety cap, and specifies by what factor you can exceed the regular 120 maxSMB/maxUAM minutes. Increase this experimental value slowly and with caution.</string>
     <string name="openapsama_iob_threshold_percent_summary" formatted="false">Percentage of maxIOB above which SMBs are disabled.\nDefault value: 100%\nWith 100% this feature is effectively disabled.</string>
-    <string name="oaps_aimi_shortname">AIMI</string>
     <string name="openapsaimi">"AIMI 3.3"</string>
     <string name="description_openapsaimi">Small micro-boluses based on Artificial Intelligence and Machine Learning.</string>
     <string name="user_preferences">Preferences user</string>

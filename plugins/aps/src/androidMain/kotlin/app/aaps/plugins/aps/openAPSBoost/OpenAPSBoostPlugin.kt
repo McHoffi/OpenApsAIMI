@@ -143,7 +143,6 @@ open class OpenAPSBoostPlugin @Inject constructor(
         .mainType(PluginType.APS)
         .composeContent { plugin -> app.aaps.plugins.aps.compose.OpenAPSComposeContent(apsPlugin = plugin as APS, loop = loopProvider(), rxBus = rxBus, rh = rh, dateUtil = dateUtil) }
         .pluginName(ApsStrings.openaps_boost)
-        .shortName(ApsStrings.boost_shortname)
         .preferencesVisibleInSimpleMode(false)
         .showInList { config.APS }
         .description(ApsStrings.description_boost),
