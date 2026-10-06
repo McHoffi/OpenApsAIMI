@@ -58,7 +58,7 @@ import kotlin.math.roundToInt
  * @param valueRange The range of values the input can represent
  * @param step Step increment for +/- buttons
  * @param unitLabel Unit label shown after the value
- * @param asDuration Render the value as "Xh Ym" instead of a plain number
+ * @param asDuration Show the value as "X h Y min" under the field. On by default for a minutes [unitLabel].
  * @param unitFormat The unit's format template together with the rounding it needs, from
  *   [app.aaps.core.keys.UnitType.unitFormat]
  * @param valueFormat Custom NumberFormat (overrides auto-created from decimalPlaces)
@@ -89,7 +89,7 @@ fun NumberInputRow(
     step: Double,
     modifier: Modifier = Modifier,
     unitLabel: TextRef? = null,
-    asDuration: Boolean = false,
+    asDuration: Boolean = unitLabel.isMinutesUnit(),
     unitFormat: UnitFormat? = null,
     valueFormat: NumberFormat? = null,
     decimalPlaces: Int = 0,
@@ -374,7 +374,7 @@ fun NumberInputRow(
     step: Double,
     modifier: Modifier = Modifier,
     unitLabel: TextRef? = null,
-    asDuration: Boolean = false,
+    asDuration: Boolean = unitLabel.isMinutesUnit(),
     unitFormat: UnitFormat? = null,
     valueFormat: NumberFormat? = null,
     decimalPlaces: Int = 0,

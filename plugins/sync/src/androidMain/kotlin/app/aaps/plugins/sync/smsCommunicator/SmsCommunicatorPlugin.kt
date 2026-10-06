@@ -53,7 +53,6 @@ import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.keys.interfaces.withCompose
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.objects.extensions.round
@@ -153,7 +152,6 @@ class SmsCommunicatorPlugin(
         .composeContent { SmsCommunicatorComposeContent() }
         .icon(IcPluginSms)
         .pluginName(SyncStrings.smscommunicator)
-        .shortName(SyncStrings.smscommunicator_shortname)
         .description(SyncStrings.description_sms_communicator),
     ownPreferences = SmsIntentKey.entries,
     aapsLogger, rh, preferences, notificationManager

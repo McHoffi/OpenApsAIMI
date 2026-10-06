@@ -183,7 +183,9 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
 
         assertIs<WorkOutcome.Success>(result)
         verify(mockedRxBus).send(any<EventBucketedDataCreated>())
-        verify(dataIobCob).clearCache()
+        // The cached IOB is kept for a new BG, only old entries are dropped
+        verify(dataIobCob).bgDataReloaded()
+        verify(dataIobCob, never()).clearCache()
         // Terminal-only progress not emitted when emitFinalProgress = false
         verify(signals, never()).emitProgress(eq(ProgressData.DRAW_FINAL), any())
     }

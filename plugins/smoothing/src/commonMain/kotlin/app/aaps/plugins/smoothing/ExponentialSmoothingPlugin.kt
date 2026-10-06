@@ -36,7 +36,6 @@ class ExponentialSmoothingPlugin(
         .mainType(PluginType.SMOOTHING)
         .icon(Icons.Default.Timeline)
         .pluginName(SmoothingStrings.exponential_smoothing_name)
-        .shortName(SmoothingStrings.smoothing_shortname)
         .description(SmoothingStrings.description_exponential_smoothing),
     aapsLogger, rh, notificationManager
 ), Smoothing {

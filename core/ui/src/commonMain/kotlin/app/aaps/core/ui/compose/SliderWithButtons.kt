@@ -56,9 +56,12 @@ import kotlin.math.roundToLong
  *   or "%1$d min"), from [app.aaps.core.keys.UnitType.unitFormat]
  * @param valueFormat Format for the value (used for dialog and fallback)
  * @param unitLabel Unit label, shown after the value and as the dialog input suffix
- * @param asDuration Render the value as "Xh Ym" instead of a plain number
+ * @param asDuration Render the value as "X h Y min" instead of a plain number. On by default for a minutes [unitLabel].
  * @param dialogLabel Label for the input dialog
  * @param dialogSummary Summary/description for the input dialog
+ * @param commitOnRelease If true, a slider drag only shows the new value and calls [onValueChange]
+ *   once, when the finger is lifted. Use it where every change has a cost (a preference on a client
+ *   is sent to the master). The +/- buttons and the dialog still call [onValueChange] right away.
  * @param modifier Modifier for the Row container
  *
  * @see SliderWithButtonsPreview
@@ -77,15 +80,19 @@ fun SliderWithButtons(
     unitFormat: UnitFormat? = null,
     valueFormat: NumberFormat = NumberFormat.DECIMAL_1,
     unitLabel: TextRef? = null,
-    asDuration: Boolean = false,
+    asDuration: Boolean = unitLabel.isMinutesUnit(),
     dialogLabel: String? = null,
     dialogSummary: String? = null,
     enabled: Boolean = true,
+    commitOnRelease: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val minValue = valueRange.start
     val maxValue = valueRange.endInclusive
     var showDialog by remember { mutableStateOf(false) }
+    // Value under the finger while a drag is running with commitOnRelease, null otherwise
+    var dragValue by remember { mutableStateOf<Double?>(null) }
+    val shownValue = dragValue ?: value
 
     // Normalise ControlPoints to ensure % and values are consistent with min & maxValue
     val normalizedControlPoints by remember(controlPoints, minValue, maxValue) {
@@ -162,7 +169,7 @@ fun SliderWithButtons(
 
     // Use shared formatting function for display text (coerced so out-of-range stored values still read sensibly)
     val displayText = if (showValue) formatSliderDisplayValue(
-        value = currentValue,
+        value = shownValue,
         unitLabel = unitLabel,
         unitFormat = unitFormat,
         valueFormat = valueFormat,
@@ -212,11 +219,16 @@ fun SliderWithButtons(
             if (showSlider) {
                 // Non-Linear Slider
                 Slider(
-                    value = currentPosition,
+                    value = dragValue?.let { valueToPosition(it) } ?: currentPosition,
                     onValueChange = { newPos ->
                         val newValue = positionToValue(newPos)
-                        val rounded = roundToStep(newValue, step)
-                        onValueChange(rounded.coerceIn(minValue, maxValue))
+                        val rounded = roundToStep(newValue, step).coerceIn(minValue, maxValue)
+                        if (commitOnRelease) dragValue = rounded
+                        else onValueChange(rounded)
+                    },
+                    onValueChangeFinished = {
+                        dragValue?.let { onValueChange(it) }
+                        dragValue = null
                     },
                     enabled = enabled,
                     valueRange = 0f..1f,

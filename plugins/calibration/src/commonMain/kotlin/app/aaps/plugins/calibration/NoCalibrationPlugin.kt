@@ -35,7 +35,6 @@ class NoCalibrationPlugin(
         .icon(IcCalibration)
         .setDefault(true)
         .pluginName(CalibrationStrings.no_calibration_name)
-        .shortName(CalibrationStrings.calibration_shortname)
         .description(CalibrationStrings.description_no_calibration),
     aapsLogger, rh, notificationManager
 ), Calibration {

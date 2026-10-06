@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.animateContentSize
@@ -95,7 +96,8 @@ fun MainNavigationBar(
                         )
                     }
                 },
-                label = { Text(text = stringResource(CoreUiStrings.treatments)) },                colors = navColors
+                label = { Text(text = stringResource(CoreUiStrings.treatments), textAlign = TextAlign.Center) },
+                colors = navColors
             )
         }
 
@@ -123,7 +125,8 @@ fun MainNavigationBar(
                         )
                     }
                 },
-                label = { Text(text = stringResource(CoreUiStrings.scenes)) },                colors = navColors
+                label = { Text(text = stringResource(CoreUiStrings.scenes), textAlign = TextAlign.Center) },
+                colors = navColors
             )
         }
 
@@ -137,7 +140,8 @@ fun MainNavigationBar(
                     contentDescription = stringResource(CoreUiStrings.manage)
                 )
             },
-            label = { Text(text = stringResource(CoreUiStrings.manage)) },            colors = navColors
+            label = { Text(text = stringResource(CoreUiStrings.manage), textAlign = TextAlign.Center) },
+            colors = navColors
         )
 
         // Pump setup (visible only when pump not initialized and has compose content)
@@ -253,7 +257,8 @@ fun MainNavigationBar(
                         )
                     }
                 },
-                label = { Text(text = stringResource(UiStrings.loop_accept_nav_label)) },                colors = navColors
+                label = { Text(text = stringResource(UiStrings.loop_accept_nav_label), textAlign = TextAlign.Center) },
+                colors = navColors
             )
         }
 
@@ -270,7 +275,8 @@ fun MainNavigationBar(
                         )
                     }
                 },
-                label = { Text(text = stringResource(UiStrings.permission_nav_label)) },                colors = navColors.copy(
+                label = { Text(text = stringResource(UiStrings.permission_nav_label), textAlign = TextAlign.Center) },
+                colors = navColors.copy(
                     unselectedIconColor = MaterialTheme.colorScheme.error,
                     unselectedTextColor = MaterialTheme.colorScheme.error,
                 )
