@@ -61,11 +61,13 @@ data class SecondaryGraph(
  *
  * Fixed graphs (not removable):
  * - BG graph: blood glucose with optional activity overlay (toggled via [bgOverlays]).
- * - IOB graph: IOB line with bolus markers + flipped basal overlay, with optional activity
- *   overlay (toggled via [iobOverlays]).
+ * - IOB graph: IOB line with bolus markers, plus optional flipped basal and optional activity
+ *   overlay (both toggled via [iobOverlays]).
  *
  * @param bgOverlays       Overlay toggles for the BG graph (currently only [SeriesType.ACTIVITY]).
- * @param iobOverlays      Overlay toggles for the fixed IOB graph (currently only [SeriesType.ACTIVITY]).
+ * @param iobOverlays      Overlay toggles for the fixed IOB graph: [SeriesType.BASAL] is the
+ *   flipped basal half, [SeriesType.ACTIVITY] the activity line. Default is basal on, activity
+ *   off. Restore of the strip keeps whatever the user last chose here.
  * @param secondaryGraphs  Ordered list of user-configurable secondary graph configurations.
  *   IOB cannot appear here (it has a dedicated fixed slot). Each graph is a List (not Set) to
  *   preserve selection order:
@@ -75,7 +77,7 @@ data class SecondaryGraph(
 data class GraphConfig(
     val bgOverlays: List<SeriesType> = listOf(SeriesType.BASAL, SeriesType.BOLUS, SeriesType.ACTIVITY),
     val showIobGraph: Boolean = true,
-    val iobOverlays: List<SeriesType> = listOf(SeriesType.ACTIVITY),
+    val iobOverlays: List<SeriesType> = listOf(SeriesType.BASAL),
     val bgHeight: Int = DEFAULT_GRAPH_HEIGHT_DP,
     val iobHeight: Int = DEFAULT_GRAPH_HEIGHT_DP,
     val secondaryGraphs: List<SecondaryGraph> = listOf(

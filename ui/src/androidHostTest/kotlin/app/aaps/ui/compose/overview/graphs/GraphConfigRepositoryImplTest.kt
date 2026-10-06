@@ -20,7 +20,7 @@ class GraphConfigRepositoryImplTest {
     fun `a configuration survives a round trip`() {
         val config = GraphConfig(
             bgOverlays = listOf(SeriesType.ACTIVITY, SeriesType.PREDICTIONS),
-            iobOverlays = listOf(SeriesType.ACTIVITY),
+            iobOverlays = listOf(SeriesType.BASAL),
             bgHeight = 200,
             iobHeight = 150,
             secondaryGraphs = listOf(SecondaryGraph(listOf(SeriesType.COB), 180))
@@ -29,6 +29,26 @@ class GraphConfigRepositoryImplTest {
         val restored = GraphConfigRepositoryImpl.fromJson(GraphConfigRepositoryImpl.toJson(config))
 
         assertThat(restored).isEqualTo(config)
+    }
+
+    @Test
+    fun `an IOB overlay choice without basal survives a round trip`() {
+        // The user turned the flipped basal half off and left activity on. The read path must not
+        // put basal back once the document is written in the current format.
+        val config = GraphConfig(iobOverlays = listOf(SeriesType.ACTIVITY))
+
+        val restored = GraphConfigRepositoryImpl.fromJson(GraphConfigRepositoryImpl.toJson(config))
+
+        assertThat(restored.iobOverlays).containsExactly(SeriesType.ACTIVITY)
+    }
+
+    @Test
+    fun `an empty IOB overlay list survives a round trip`() {
+        val config = GraphConfig(iobOverlays = emptyList())
+
+        val restored = GraphConfigRepositoryImpl.fromJson(GraphConfigRepositoryImpl.toJson(config))
+
+        assertThat(restored.iobOverlays).isEmpty()
     }
 
     @Test
@@ -116,6 +136,27 @@ class GraphConfigRepositoryImplTest {
         val restored = GraphConfigRepositoryImpl.fromJson("{}")
 
         assertThat(restored.bgOverlays).containsExactly(SeriesType.ACTIVITY, SeriesType.PREDICTIONS).inOrder()
+        // Basal on, activity off: activity is no longer forced on by default.
+        assertThat(restored.iobOverlays).containsExactly(SeriesType.BASAL)
+    }
+
+    @Test
+    fun `a legacy IOB overlay list gains the basal half it could not store`() {
+        // Before basal was a toggle it was always drawn, so old documents only ever list activity
+        // (or nothing). An upgrade must keep the basal half instead of dropping it.
+        val withActivity = GraphConfigRepositoryImpl.fromJson("""{"iobOverlays":["ACTIVITY"]}""")
+        assertThat(withActivity.iobOverlays)
+            .containsExactly(SeriesType.BASAL, SeriesType.ACTIVITY).inOrder()
+
+        val withNothing = GraphConfigRepositoryImpl.fromJson("""{"iobOverlays":[]}""")
+        assertThat(withNothing.iobOverlays).containsExactly(SeriesType.BASAL)
+    }
+
+    @Test
+    fun `the current IOB overlay list is taken as written`() {
+        // The v2 flag says the list already carries the basal choice, so it is not rewritten.
+        val restored = GraphConfigRepositoryImpl.fromJson("""{"iobOverlays":["ACTIVITY"],"iobOverlaysV2":true}""")
+
         assertThat(restored.iobOverlays).containsExactly(SeriesType.ACTIVITY)
     }
 

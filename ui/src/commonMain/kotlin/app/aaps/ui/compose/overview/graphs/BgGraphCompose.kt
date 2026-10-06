@@ -657,7 +657,6 @@ fun BgGraphCompose(
     } else {
         scheme.error.copy(alpha = 0.88f)
     }
-    val smbPointSize = if (dashboardSoftTherapyVisuals) 9.dp else 11.dp
     val smbStrokeThickness = if (dashboardSoftTherapyVisuals) 1.dp else 2.dp
     // Hit target only: the visible triangles are drawn by [SmbMarkersDecoration] over the layers.
     val smbDashboardLine = remember {
@@ -930,10 +929,15 @@ fun BgGraphCompose(
         } else {
             treatmentData.boluses
                 .filter { it.isValid && it.bolusType == BolusType.SMB }
-                .map { it.timestamp to timestampToX(it.timestamp, minTimestamp) }
+                .map { bolus -> bolus to timestampToX(bolus.timestamp, minTimestamp) }
                 .filter { (_, x) -> x in 0.0..maxX }
-                .map { (timestamp, x) ->
-                    SmbMarkerPoint(timestampEpochMs = timestamp, x = x, y = chartConfig.lowMark)
+                .map { (bolus, x) ->
+                    SmbMarkerPoint(
+                        timestampEpochMs = bolus.timestamp,
+                        x = x,
+                        y = chartConfig.lowMark,
+                        amountUnits = bolus.amount,
+                    )
                 }
         }
     }
@@ -941,7 +945,9 @@ fun BgGraphCompose(
         points = overviewSmbPoints,
         color = smbColor,
         outlineColor = markerOutlineColor,
-        size = chartStyle.smbMarkerSize,
+        smallSize = chartStyle.smbMarkerSizeSmall,
+        mediumSize = chartStyle.smbMarkerSizeMedium,
+        largeSize = chartStyle.smbMarkerSizeLarge,
         strokeWidth = chartStyle.smbMarkerStrokeWidth,
         hitHolder = overviewSmbHits,
     )
@@ -966,6 +972,7 @@ fun BgGraphCompose(
                     timestampEpochMs = m.timestampEpochMs,
                     x = timestampToX(m.timestampEpochMs, minTimestamp),
                     y = viewModel.glucoseMgdlToChartY(mgdl),
+                    amountUnits = m.amountUnits,
                 )
             }
         }
@@ -974,7 +981,9 @@ fun BgGraphCompose(
         points = dashboardSmbPoints,
         color = smbFillResolved,
         outlineColor = smbStrokeResolved,
-        size = smbPointSize,
+        smallSize = chartStyle.smbMarkerSizeSmall,
+        mediumSize = chartStyle.smbMarkerSizeMedium,
+        largeSize = chartStyle.smbMarkerSizeLarge,
         strokeWidth = smbStrokeThickness,
         hitHolder = dashboardSmbHits,
     )
@@ -1364,6 +1373,7 @@ private class DashboardSmbTapMarkerController(
                         bestDist = d
                         bestSmb = ChartSmbMarker(
                             timestampEpochMs = bolus.timestamp,
+                            amountUnits = bolus.amount,
                             amountLabel = bolus.label,
                         )
                     }
@@ -1388,6 +1398,7 @@ private class DashboardSmbTapMarkerController(
         val bolus = smbBoluses.firstOrNull { it.timestamp == timestampEpochMs } ?: return null
         return ChartSmbMarker(
             timestampEpochMs = bolus.timestamp,
+            amountUnits = bolus.amount,
             amountLabel = bolus.label,
         )
     }

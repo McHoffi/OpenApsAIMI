@@ -198,6 +198,9 @@ private class StateOrdinalVerticalAxisItemPlacer(
  * - COB: Orange adaptive-step line with area fill + carbs markers + failover dots
  * - Simple line series (AbsIOB, BGI, Sensitivity, VarSens, DevSlope, HR, Steps): Colored line with gradient fill
  * - Deviations: Per-type colored step lines with gradient fill (POSITIVE/NEGATIVE/EQUAL/UAM/CSF)
+ *
+ * On an IOB graph the flipped basal half is optional ([basalOverlay]), same as the activity
+ * line ([activityOverlay]).
  */
 @OptIn(FlowPreview::class)
 @Composable
@@ -209,6 +212,7 @@ fun SecondaryGraphCompose(
     derivedTimeRange: Pair<Long, Long>?,
     nowTimestamp: Long,
     activityOverlay: Boolean = false,
+    basalOverlay: Boolean = true,
     onVisibleRangeChanged: ((Pair<Double, Double>?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -299,7 +303,8 @@ fun SecondaryGraphCompose(
     // Basal overlay only when IOB is primary and single-axis (no room for basal with dual-axis)
     //val basalData = if (hasIob && !isDualAxis) viewModel.basalGraphFlow.collectAsStateWithLifecycle().value else null
     val hasBasalSeries = SeriesType.BASAL in seriesTypes
-    val basalData = if ((hasIob && !isDualAxis) || hasBasalSeries)
+    val wantsIobBasalOverlay = hasIob && basalOverlay && !isDualAxis
+    val basalData = if (wantsIobBasalOverlay || hasBasalSeries)
         viewModel.basalGraphFlow.collectAsStateWithLifecycle().value else null
 
 
@@ -501,7 +506,7 @@ fun SecondaryGraphCompose(
         filterToRange(pts, minX, maxX)
     }
 
-    // Flipped basal overlay — fixed on IOB graphs, rendered as a second chart layer.
+    // Flipped basal overlay — optional on IOB graphs, rendered as a second chart layer.
     // Uses negative Y values so area fill goes upward to y=0 (the top of the basal layer).
     val processedBasalProfile = remember(basalData, hasIob, stableTimeRange) {
         if (!hasRealTimeRange || basalData == null) return@remember emptyList()
@@ -516,7 +521,7 @@ fun SecondaryGraphCompose(
         if (hasIob) pts.map { (x, y) -> x to -y } else pts
     }
 
-    val hasBasalLayer = hasIob && basalData != null && !isDualAxis
+    val hasBasalLayer = wantsIobBasalOverlay && basalData != null
 
     // Activity overlay (scaled to fit within IOB's Y range, like BG graph)
     val processedActivityOverlay = remember(activityOverlay, hasIob, activityData, processedIob, stableTimeRange) {
@@ -1315,40 +1320,21 @@ internal fun processStepPoints(points: List<GraphDataPoint>, minTimestamp: Long,
     return inRange + (maxX to edgeValue)
 }
 
-/** Process IOB treatment overlays: split SMBs by size, extract boluses and extended boluses */
+/** Process IOB treatment overlays: split SMBs by dose size, extract boluses and extended boluses */
 @Suppress("SameParameterValue")
 private fun processIobOverlays(data: TreatmentGraphData, minTimestamp: Long, minX: Double, maxX: Double): ProcessedIobOverlays {
-    // Filter SMBs to visible range before computing size thresholds (prevents off-screen outliers from distorting buckets)
     val smbs = data.boluses.filter { it.bolusType == BolusType.SMB && timestampToX(it.timestamp, minTimestamp) in minX..maxX }
 
-    var smallSmbs: List<Pair<Double, Double>> = emptyList()
-    var mediumSmbs: List<Pair<Double, Double>> = emptyList()
-    var largeSmbs: List<Pair<Double, Double>> = emptyList()
+    val smallSmbs: MutableList<Pair<Double, Double>> = mutableListOf()
+    val mediumSmbs: MutableList<Pair<Double, Double>> = mutableListOf()
+    val largeSmbs: MutableList<Pair<Double, Double>> = mutableListOf()
 
-    if (smbs.isNotEmpty()) {
-        if (smbs.size <= 1 || smbs.minOf { it.amount } == smbs.maxOf { it.amount }) {
-            mediumSmbs = smbs.map { timestampToX(it.timestamp, minTimestamp) to 0.0 }
-        } else {
-            val minAmount = smbs.minOf { it.amount }
-            val range = smbs.maxOf { it.amount } - minAmount
-            val smallThreshold = minAmount + range / 3.0
-            val largeThreshold = minAmount + 2.0 * range / 3.0
-
-            val small = mutableListOf<Pair<Double, Double>>()
-            val medium = mutableListOf<Pair<Double, Double>>()
-            val large = mutableListOf<Pair<Double, Double>>()
-
-            for (smb in smbs) {
-                val point = timestampToX(smb.timestamp, minTimestamp) to 0.0
-                when {
-                    smb.amount < smallThreshold -> small.add(point)
-                    smb.amount < largeThreshold -> medium.add(point)
-                    else                        -> large.add(point)
-                }
-            }
-            smallSmbs = small
-            mediumSmbs = medium
-            largeSmbs = large
+    for (smb in smbs) {
+        val point = timestampToX(smb.timestamp, minTimestamp) to 0.0
+        when (smbSizeTierOf(smb.amount)) {
+            SmbSizeTier.SMALL  -> smallSmbs.add(point)
+            SmbSizeTier.MEDIUM -> mediumSmbs.add(point)
+            SmbSizeTier.LARGE  -> largeSmbs.add(point)
         }
     }
 
@@ -1572,6 +1558,9 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
         chartStyle.seriesAreaFillTopAlpha,
         chartStyle.seriesAreaFillBottomAlpha,
         chartStyle.smbMarkerStrokeWidth,
+        chartStyle.smbMarkerSizeSmall,
+        chartStyle.smbMarkerSizeMedium,
+        chartStyle.smbMarkerSizeLarge,
         smbColor,
         markerOutlineColor,
         extBolusColor,
@@ -1607,7 +1596,7 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
                             strokeFill = Fill(markerOutlineColor),
                             strokeThickness = chartStyle.smbMarkerStrokeWidth,
                         ),
-                        size = 10.dp,
+                        size = chartStyle.smbMarkerSizeSmall,
                     )
                 )
             ),
@@ -1622,7 +1611,7 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
                             strokeFill = Fill(markerOutlineColor),
                             strokeThickness = chartStyle.smbMarkerStrokeWidth,
                         ),
-                        size = 16.dp,
+                        size = chartStyle.smbMarkerSizeMedium,
                     )
                 )
             ),
@@ -1637,7 +1626,7 @@ fun rememberIobLineStyles(showPointDataLabels: Boolean): IobLineStyles {
                             strokeFill = Fill(markerOutlineColor),
                             strokeThickness = chartStyle.smbMarkerStrokeWidth,
                         ),
-                        size = 22.dp,
+                        size = chartStyle.smbMarkerSizeLarge,
                     )
                 )
             ),

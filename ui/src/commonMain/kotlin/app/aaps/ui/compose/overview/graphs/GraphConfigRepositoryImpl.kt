@@ -80,6 +80,13 @@ class GraphConfigRepositoryImpl(
         private const val KEY_BG_OVERLAYS = "bgOverlays"
         private const val KEY_SHOW_IOB_GRAPH = "showIobGraph"
         private const val KEY_IOB_OVERLAYS = "iobOverlays"
+
+        /**
+         * Written with [KEY_IOB_OVERLAYS] once basal became a real toggle. Its absence means the
+         * list was written when basal was always drawn on the IOB strip and could not be stored,
+         * so the read path adds [SeriesType.BASAL] back (see [fromJson]).
+         */
+        private const val KEY_IOB_OVERLAYS_V2 = "iobOverlaysV2"
         private const val KEY_BG_HEIGHT = "bgHeight"
         private const val KEY_IOB_HEIGHT = "iobHeight"
         private const val KEY_SERIES = "series"
@@ -108,6 +115,7 @@ class GraphConfigRepositoryImpl(
                 put(KEY_BG_OVERLAYS, overlaysToJson(config.bgOverlays))
                 put(KEY_SHOW_IOB_GRAPH, config.showIobGraph)
                 put(KEY_IOB_OVERLAYS, overlaysToJson(config.iobOverlays))
+                put(KEY_IOB_OVERLAYS_V2, true)
                 put(KEY_BG_HEIGHT, config.bgHeight)
                 put(KEY_IOB_HEIGHT, config.iobHeight)
                 put(
@@ -137,7 +145,15 @@ class GraphConfigRepositoryImpl(
         fun fromJson(json: String): GraphConfig {
             val obj = Json.parseToJsonElement(json) as JsonObject
             val bgOverlays = overlaysFromJson(obj.array(KEY_BG_OVERLAYS), listOf(SeriesType.ACTIVITY, SeriesType.PREDICTIONS))
-            val iobOverlays = overlaysFromJson(obj.array(KEY_IOB_OVERLAYS), listOf(SeriesType.ACTIVITY))
+            val iobOverlays = overlaysFromJson(obj.array(KEY_IOB_OVERLAYS), listOf(SeriesType.BASAL)).let { parsed ->
+                if (obj.boolean(KEY_IOB_OVERLAYS_V2, false)) {
+                    parsed
+                } else {
+                    // Legacy document: basal was always on and was not a stored toggle.
+                    // Keep it on so an upgrade does not silently drop the basal half of the panel.
+                    (listOf(SeriesType.BASAL) + parsed).distinct()
+                }
+            }
             val bgHeight = obj.height(KEY_BG_HEIGHT)
             val iobHeight = obj.height(KEY_IOB_HEIGHT)
             val graphs = mutableListOf<SecondaryGraph>()

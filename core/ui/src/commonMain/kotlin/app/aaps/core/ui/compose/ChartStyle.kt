@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.dp
  * @property gridAlpha Alpha of the axis gridlines on a normal background
  * @property glassGridAlpha Alpha of the axis gridlines over the glass (overview) background
  * @property axisLabelAlpha Alpha of the axis tick labels
- * @property smbMarkerSize Diameter of the SMB marker box on the BG chart (triangle drawn inside it)
+ * @property smbMarkerSizeSmall Diameter of a small SMB triangle (dose below 0.5 U)
+ * @property smbMarkerSizeMedium Diameter of a medium SMB triangle (dose 0.5 U to 2.5 U)
+ * @property smbMarkerSizeLarge Diameter of a large SMB triangle (dose above 2.5 U)
  * @property smbMarkerStrokeWidth Stroke width of the outline around SMB / bolus markers
  * @property smbMarkerTouchRadius Radius of the tap hit box around an SMB marker (bigger = easier to tap)
  * @property nowLineStrokeWidth Stroke width of the core "now" dashed line
@@ -64,7 +66,9 @@ data class ChartStyle(
     val gridAlpha: Float,
     val glassGridAlpha: Float,
     val axisLabelAlpha: Float,
-    val smbMarkerSize: Dp,
+    val smbMarkerSizeSmall: Dp,
+    val smbMarkerSizeMedium: Dp,
+    val smbMarkerSizeLarge: Dp,
     val smbMarkerStrokeWidth: Dp,
     val smbMarkerTouchRadius: Dp,
     val nowLineStrokeWidth: Dp,
@@ -96,7 +100,9 @@ val LightChartStyle = ChartStyle(
     gridAlpha = 0.20f,
     glassGridAlpha = 0.25f,
     axisLabelAlpha = 0.65f,
-    smbMarkerSize = 13.dp,
+    smbMarkerSizeSmall = 10.dp,
+    smbMarkerSizeMedium = 16.dp,
+    smbMarkerSizeLarge = 22.dp,
     smbMarkerStrokeWidth = 1.5.dp,
     smbMarkerTouchRadius = 28.dp,
     nowLineStrokeWidth = 1.2.dp,
@@ -128,7 +134,9 @@ val DarkChartStyle = ChartStyle(
     gridAlpha = 0.20f,
     glassGridAlpha = 0.25f,
     axisLabelAlpha = 0.65f,
-    smbMarkerSize = 13.dp,
+    smbMarkerSizeSmall = 10.dp,
+    smbMarkerSizeMedium = 16.dp,
+    smbMarkerSizeLarge = 22.dp,
     smbMarkerStrokeWidth = 1.5.dp,
     smbMarkerTouchRadius = 28.dp,
     nowLineStrokeWidth = 1.2.dp,

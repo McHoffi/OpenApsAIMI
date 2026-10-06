@@ -1272,6 +1272,7 @@
 
     <!-- Graph configuration -->
     <string name="graph_add">Add graph</string>
+    <string name="graph_restore_iob" comment="Chip in the Add graph sheet that brings back the fixed IOB strip">IOB graph</string>
     <string name="graph_new">New graph</string>
     <string name="graph_edit">Edit graph</string>
     <string name="graph_number">Graph %1$d</string>

@@ -137,7 +137,8 @@ import kotlinx.coroutines.flow.debounce
  */
 private val SIMPLE_MODE_CONFIG = GraphConfig(
     bgOverlays = emptyList(),
-    iobOverlays = emptyList(),
+    // Simple mode keeps the flipped basal half of the IOB strip and hides the activity line.
+    iobOverlays = listOf(SeriesType.BASAL),
     secondaryGraphs = listOf(SecondaryGraph(listOf(SeriesType.COB)))
 )
 
@@ -167,10 +168,71 @@ private val AIMI_SERIES = setOf(
     SeriesType.MODES,
 )
 
+/**
+ * BOOST panel + meal-hypothesis step line. Both only draw while BOOST is the active APS, so the
+ * picker must not offer them otherwise (adding one would just make a hidden slot).
+ */
+private val BOOST_SERIES = setOf(
+    SeriesType.BOOST,
+    SeriesType.MHS,
+)
+
 /** Base series types for user-configurable secondary graphs (IOB + UI-only overlays excluded) */
 private val BASE_CONFIGURABLE_SERIES = SeriesType.entries.filter {
-    it != SeriesType.IOB && it != SeriesType.PREDICTIONS && it !in AUTOISF_SERIES && it !in AIMI_SERIES
+    it != SeriesType.IOB && it != SeriesType.PREDICTIONS &&
+        it !in AUTOISF_SERIES && it !in AIMI_SERIES && it !in BOOST_SERIES
 }
+
+/**
+ * Series the Add / edit sheet offers. APS-specific types appear only while that APS is active, so
+ * the user cannot add a graph that would draw nothing.
+ */
+internal fun availableSecondarySeries(
+    isAutoIsfActive: Boolean,
+    isAIMIActive: Boolean,
+    isBoostActive: Boolean,
+): List<SeriesType> {
+    val base = when {
+        isAutoIsfActive -> BASE_CONFIGURABLE_SERIES + AUTOISF_SERIES
+        isAIMIActive    -> BASE_CONFIGURABLE_SERIES + AIMI_SERIES
+        else            -> BASE_CONFIGURABLE_SERIES
+    }
+    return if (isBoostActive) base + BOOST_SERIES else base
+}
+
+/**
+ * True when a secondary graph draws nothing right now (MHS-only, or any BOOST graph, while BOOST
+ * is not the active algorithm). The entry stays in the config and still takes a list index.
+ */
+internal fun isHiddenSecondarySlot(
+    secondary: SecondaryGraph,
+    isBoostActive: Boolean,
+): Boolean {
+    val customType = secondary.series.firstOrNull {
+        it in AIMI_SERIES || it == SeriesType.PULSE || it == SeriesType.BOOST
+    }
+    return (customType == null && secondary.series == listOf(SeriesType.MHS) && !isBoostActive) ||
+        (customType == SeriesType.BOOST && !isBoostActive)
+}
+
+/**
+ * Number in the edit-sheet title. The fixed IOB strip is conceptually Graph 1, so the first
+ * visible secondary is Graph 2. Hidden slots are not counted, so the title matches the screen.
+ */
+internal fun secondaryGraphDisplayNumber(
+    index: Int,
+    graphs: List<SecondaryGraph>,
+    isBoostActive: Boolean,
+): Int = graphs.take(index).count { !isHiddenSecondarySlot(it, isBoostActive) } + 2
+
+/**
+ * Drop secondary graphs that draw nothing right now. Used when a new graph needs a free slot,
+ * so hidden entries cannot block adding.
+ */
+internal fun compactHiddenSecondarySlots(
+    graphs: List<SecondaryGraph>,
+    isBoostActive: Boolean,
+): List<SecondaryGraph> = graphs.filterNot { isHiddenSecondarySlot(it, isBoostActive) }
 
 
 // =========================================================================
@@ -268,12 +330,8 @@ fun GraphsSection(
     val isAIMIActive by graphViewModel.isAIMIActiveFlow.collectAsStateWithLifecycle()
     // MHB subgraph renders nothing when BOOST is not the active algorithm (same gate as the BOOST panel)
     val isBoostActive by graphViewModel.isBoostActiveFlow.collectAsStateWithLifecycle()
-    val configurableSeries = remember(isAutoIsfActive, isAIMIActive) {
-        when {
-            isAutoIsfActive -> BASE_CONFIGURABLE_SERIES + AUTOISF_SERIES.toList()
-            isAIMIActive    -> BASE_CONFIGURABLE_SERIES + AIMI_SERIES.toList()
-            else            -> BASE_CONFIGURABLE_SERIES
-        }
+    val configurableSeries = remember(isAutoIsfActive, isAIMIActive, isBoostActive) {
+        availableSecondarySeries(isAutoIsfActive, isAIMIActive, isBoostActive)
     }
 
 
@@ -665,6 +723,7 @@ fun GraphsSection(
                     derivedTimeRange = derivedTimeRange,
                     nowTimestamp = nowTimestamp,
                     activityOverlay = SeriesType.ACTIVITY in graphConfig.iobOverlays,
+                    basalOverlay = SeriesType.BASAL in graphConfig.iobOverlays,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(graphConfig.iobHeight.dp)
@@ -674,7 +733,9 @@ fun GraphsSection(
                 val iobHeaderBasalColor = AapsTheme.elementColors.tempBasal
                 val iobHeaderParts = buildList {
                     add(stringResource(CoreUiStrings.iob) to iobHeaderColors.iob)
-                    add(stringResource(CoreUiStrings.basal_shortname) to iobHeaderBasalColor)
+                    if (SeriesType.BASAL in graphConfig.iobOverlays) {
+                        add(stringResource(CoreUiStrings.basal_shortname) to iobHeaderBasalColor)
+                    }
                     if (SeriesType.ACTIVITY in graphConfig.iobOverlays) {
                         add(stringResource(CoreUiStrings.activity_shortname) to iobHeaderColors.activity)
                     }
@@ -690,9 +751,9 @@ fun GraphsSection(
             }
             if (editingIobOverlays) {
                 GraphSeriesBottomSheet(
-                    title = stringResource(CoreUiStrings.iob) + " / " + stringResource(CoreUiStrings.basal_shortname),
+                    title = stringResource(CoreUiStrings.iob),
                     selectedSeries = graphConfig.iobOverlays,
-                    availableSeries = listOf(SeriesType.ACTIVITY),
+                    availableSeries = listOf(SeriesType.BASAL, SeriesType.ACTIVITY),
                     height = graphConfig.iobHeight,
                     onHeightChange = { h ->
                         graphViewModel.updateGraphConfig(graphConfig.copy(iobHeight = h))
@@ -703,6 +764,8 @@ fun GraphsSection(
                         graphViewModel.updateGraphConfig(graphConfig.copy(iobOverlays = current))
                     },
                     onRemoveGraph = {
+                        // Keep iobOverlays as they are so a later restore brings back the same
+                        // BAS / ACT choice instead of the defaults.
                         graphViewModel.updateGraphConfig(graphConfig.copy(showIobGraph = false))
                         editingIobOverlays = false
                     },
@@ -719,10 +782,7 @@ fun GraphsSection(
             }
             // MHS and BOOST render nothing when BOOST is not the active algorithm.
             // Skip the glass frame too, so an empty slot never paints an empty card.
-            val isEmptySlot =
-                (customType == null && secondary.series == listOf(SeriesType.MHS) && !isBoostActive) ||
-                    (customType == SeriesType.BOOST && !isBoostActive)
-            if (isEmptySlot) continue
+            if (isHiddenSecondarySlot(secondary, isBoostActive)) continue
             OverviewGlassPanel(modifier = Modifier.fillMaxWidth().then(stitchStrip)) { panelModifier ->
             Box(modifier = panelModifier.fillMaxWidth()) {
                 when (customType) {
@@ -815,7 +875,10 @@ fun GraphsSection(
         if (editingGraphIndex >= 0 && editingGraphIndex < activeCount) {
             val editing = graphConfig.secondaryGraphs[editingGraphIndex]
             GraphSeriesBottomSheet(
-                title = stringResource(CoreUiStrings.graph_number, editingGraphIndex + 2),
+                title = stringResource(
+                    CoreUiStrings.graph_number,
+                    secondaryGraphDisplayNumber(editingGraphIndex, graphConfig.secondaryGraphs, isBoostActive),
+                ),
                 selectedSeries = editing.series,
                 availableSeries = configurableSeries,
                 height = editing.height,
@@ -851,8 +914,16 @@ fun GraphsSection(
                 onDismiss = { editingGraphIndex = -1 }
             )
         }
-        // Add graph button (hidden in simple mode)
-        if (!isSimpleMode && activeCount < GraphConfig.MAX_SECONDARY_GRAPHS) {
+        // Add graph button (hidden in simple mode).
+        // Hidden MHS/BOOST slots do not count toward the max, so they cannot block adding.
+        // The fixed IOB strip is not a secondary slot: restoring it stays possible even when
+        // every secondary slot is full.
+        val visibleSecondaryCount = graphConfig.secondaryGraphs
+            .take(GraphConfig.MAX_SECONDARY_GRAPHS)
+            .count { !isHiddenSecondarySlot(it, isBoostActive) }
+        val canAddSecondary = visibleSecondaryCount < GraphConfig.MAX_SECONDARY_GRAPHS
+        val canRestoreIob = !graphConfig.showIobGraph
+        if (!isSimpleMode && (canAddSecondary || canRestoreIob)) {
             var showAddSheet by remember { mutableStateOf(false) }
             TextButton(
                 onClick = { showAddSheet = true },
@@ -865,10 +936,15 @@ fun GraphsSection(
             if (showAddSheet) {
                 var newGraphSeries by remember { mutableStateOf(emptyList<SeriesType>()) }
                 var newGraphHeight by remember { mutableIntStateOf(GraphConfig.DEFAULT_GRAPH_HEIGHT_DP) }
+                val restoreIobLabel = if (canRestoreIob) {
+                    stringResource(CoreUiStrings.graph_restore_iob)
+                } else {
+                    null
+                }
                 GraphSeriesBottomSheet(
                     title = stringResource(CoreUiStrings.graph_new),
                     selectedSeries = newGraphSeries,
-                    availableSeries = configurableSeries,
+                    availableSeries = if (canAddSecondary) configurableSeries else emptyList(),
                     height = newGraphHeight,
                     onHeightChange = { newGraphHeight = it },
                     onToggle = { type ->
@@ -881,11 +957,30 @@ fun GraphsSection(
                         }
                         newGraphSeries = current
                     },
+                    fixedGraphChipLabel = restoreIobLabel,
+                    onAddFixedGraph = if (canRestoreIob) {
+                        {
+                            // Only flip the strip back on. iobOverlays stay as the user left them
+                            // so BAS / ACT come back the same way after Remove.
+                            graphViewModel.updateGraphConfig(graphConfig.copy(showIobGraph = true))
+                            newGraphSeries = emptyList()
+                            newGraphHeight = GraphConfig.DEFAULT_GRAPH_HEIGHT_DP
+                            showAddSheet = false
+                        }
+                    } else {
+                        null
+                    },
                     onDismiss = {
-                        if (newGraphSeries.isNotEmpty()) {
-                            val graphs = graphConfig.secondaryGraphs.toMutableList()
-                            graphs.add(SecondaryGraph(newGraphSeries, newGraphHeight))
-                            graphViewModel.updateGraphConfig(graphConfig.copy(secondaryGraphs = graphs))
+                        if (newGraphSeries.isNotEmpty() && canAddSecondary) {
+                            // Free a slot first if hidden entries are holding one.
+                            val graphs = compactHiddenSecondarySlots(
+                                graphConfig.secondaryGraphs,
+                                isBoostActive,
+                            ).toMutableList()
+                            if (graphs.size < GraphConfig.MAX_SECONDARY_GRAPHS) {
+                                graphs.add(SecondaryGraph(newGraphSeries, newGraphHeight))
+                                graphViewModel.updateGraphConfig(graphConfig.copy(secondaryGraphs = graphs))
+                            }
                         }
                         newGraphSeries = emptyList()
                         newGraphHeight = GraphConfig.DEFAULT_GRAPH_HEIGHT_DP
@@ -1215,7 +1310,10 @@ private fun GraphSeriesBottomSheet(
     onHeightChange: (Int) -> Unit,
     onToggle: (SeriesType) -> Unit,
     onDismiss: () -> Unit,
-    onRemoveGraph: (() -> Unit)? = null
+    onRemoveGraph: (() -> Unit)? = null,
+    /** Label for a chip that restores a fixed graph (IOB/BAS), not a new secondary. */
+    fixedGraphChipLabel: String? = null,
+    onAddFixedGraph: (() -> Unit)? = null,
 ) {
     // Buffer height locally — committing on every keystroke crashed the parent
     // composition (Vico SubcomposeLayout + IME insets re-measurement raced with
@@ -1266,6 +1364,17 @@ private fun GraphSeriesBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
+                if (fixedGraphChipLabel != null && onAddFixedGraph != null) {
+                    FilterChip(
+                        selected = false,
+                        onClick = onAddFixedGraph,
+                        label = { Text(fixedGraphChipLabel) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
                 for (type in availableSeries) {
                     FilterChip(
                         selected = type in selectedSeries,

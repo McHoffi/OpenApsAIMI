@@ -1131,7 +1131,7 @@ internal class DashboardShellController(
             val t = b.timestamp
             if (t < fromMs || t > toMs) continue
             val label = decimalFormatter.toPumpSupportedBolusWithUnits(b.amount, bolusStep)
-            smbOnly.add(ChartSmbMarker(timestampEpochMs = t, amountLabel = label))
+            smbOnly.add(ChartSmbMarker(timestampEpochMs = t, amountUnits = b.amount, amountLabel = label))
         }
         // Some pumps/sync paths persist SMB without explicit SMB type (e.g. Medtrum, T3c mode).
         // Merge SMB-typed + any valid non-SMB bolus so users always see their deliveries on the graph.
@@ -1144,7 +1144,7 @@ internal class DashboardShellController(
             if (!b.isValid || b.amount <= 0.0) continue
             if (t in seenTimestamps) continue  // already covered by SMB-typed entry
             val label = decimalFormatter.toPumpSupportedBolusWithUnits(b.amount, bolusStep)
-            merged.add(ChartSmbMarker(timestampEpochMs = t, amountLabel = label))
+            merged.add(ChartSmbMarker(timestampEpochMs = t, amountUnits = b.amount, amountLabel = label))
         }
         if (merged.isEmpty()) return@runCatching emptyList()
         merged
@@ -1229,6 +1229,7 @@ internal class DashboardShellController(
                 .map {
                     ChartSmbMarker(
                         timestampEpochMs = it.timestamp,
+                        amountUnits = it.amount,
                         amountLabel = decimalFormatter.toPumpSupportedBolusWithUnits(it.amount, bolusStep),
                     )
                 }
@@ -1236,6 +1237,7 @@ internal class DashboardShellController(
                 validBoluses.map {
                     ChartSmbMarker(
                         timestampEpochMs = it.timestamp,
+                        amountUnits = it.amount,
                         amountLabel = decimalFormatter.toPumpSupportedBolusWithUnits(it.amount, bolusStep),
                     )
                 }
@@ -1310,7 +1312,7 @@ internal class DashboardShellController(
                     if (dp.data.type == BS.Type.SMB) {
                         val t = dp.x.toLong()
                         val label = decimalFormatter.toPumpSupportedBolusWithUnits(dp.data.amount, bolusStep)
-                        smbOnly.add(ChartSmbMarker(timestampEpochMs = t, amountLabel = label))
+                        smbOnly.add(ChartSmbMarker(timestampEpochMs = t, amountUnits = dp.data.amount, amountLabel = label))
                         seenTimestamps.add(t)
                     }
                 else -> Unit
@@ -1327,7 +1329,7 @@ internal class DashboardShellController(
                     if (dp.data.amount <= 0.0) continue
                     if (t in seenTimestamps) continue
                     val label = decimalFormatter.toPumpSupportedBolusWithUnits(dp.data.amount, bolusStep)
-                    merged.add(ChartSmbMarker(timestampEpochMs = t, amountLabel = label))
+                    merged.add(ChartSmbMarker(timestampEpochMs = t, amountUnits = dp.data.amount, amountLabel = label))
                 }
                 else -> Unit
             }

@@ -308,6 +308,29 @@ internal class GraphUtilsTest {
     }
 
     @Nested
+    inner class SmbSizeTierTest {
+
+        @Test
+        fun `dose below half a unit is small`() {
+            assertThat(smbSizeTierOf(0.0)).isEqualTo(SmbSizeTier.SMALL)
+            assertThat(smbSizeTierOf(0.49)).isEqualTo(SmbSizeTier.SMALL)
+        }
+
+        @Test
+        fun `dose from half a unit up to two and a half is medium`() {
+            assertThat(smbSizeTierOf(0.5)).isEqualTo(SmbSizeTier.MEDIUM)
+            assertThat(smbSizeTierOf(1.0)).isEqualTo(SmbSizeTier.MEDIUM)
+            assertThat(smbSizeTierOf(2.5)).isEqualTo(SmbSizeTier.MEDIUM)
+        }
+
+        @Test
+        fun `dose above two and a half is large`() {
+            assertThat(smbSizeTierOf(2.51)).isEqualTo(SmbSizeTier.LARGE)
+            assertThat(smbSizeTierOf(4.0)).isEqualTo(SmbSizeTier.LARGE)
+        }
+    }
+
+    @Nested
     inner class FindSmbCanvasHitTest {
 
         private val hitA = SmbCanvasHit(canvasX = 100f, canvasY = 200f, timestampEpochMs = 1_000L)

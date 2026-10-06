@@ -776,12 +776,35 @@ fun rememberTargetRangeBandDecoration(
 }
 
 /**
+ * Size tier for an SMB triangle. Same rule on the BG chart and the IOB chart.
+ */
+enum class SmbSizeTier { SMALL, MEDIUM, LARGE }
+
+/** Doses below this are drawn as a small triangle (U). */
+const val SMB_SIZE_SMALL_MAX_U: Double = 0.5
+
+/** Doses above this are drawn as a large triangle (U). A dose of exactly 2.5 U stays medium. */
+const val SMB_SIZE_LARGE_MIN_U: Double = 2.5
+
+/**
+ * Map an insulin dose in units to its [SmbSizeTier]:
+ * below [SMB_SIZE_SMALL_MAX_U] → small, above [SMB_SIZE_LARGE_MIN_U] → large, else medium.
+ */
+fun smbSizeTierOf(amountUnits: Double): SmbSizeTier = when {
+    amountUnits < SMB_SIZE_SMALL_MAX_U -> SmbSizeTier.SMALL
+    amountUnits > SMB_SIZE_LARGE_MIN_U -> SmbSizeTier.LARGE
+    else                               -> SmbSizeTier.MEDIUM
+}
+
+/**
  * One SMB marker in chart space, with the source timestamp so a tap can map back to the bolus.
+ * [amountUnits] picks the triangle size tier.
  */
 data class SmbMarkerPoint(
     val timestampEpochMs: Long,
     val x: Double,
     val y: Double,
+    val amountUnits: Double,
 )
 
 /**
@@ -841,7 +864,9 @@ class SmbMarkersDecoration(
     private val points: List<SmbMarkerPoint>,
     private val color: Color,
     private val outlineColor: Color,
-    private val size: Dp,
+    private val smallSize: Dp,
+    private val mediumSize: Dp,
+    private val largeSize: Dp,
     private val strokeWidth: Dp,
     private val hitHolder: SmbHitPositionHolder? = null,
 ) : Decoration {
@@ -856,15 +881,23 @@ class SmbMarkersDecoration(
             hitHolder?.points = emptyList()
             return
         }
-        val sizePx = with(context) { size.pixels }
+        val smallPx = with(context) { smallSize.pixels }
+        val mediumPx = with(context) { mediumSize.pixels }
+        val largePx = with(context) { largeSize.pixels }
         val strokePx = with(context) { strokeWidth.pixels }
-        val half = sizePx / 2f
-        val baseHalf = sizePx * 0.3f
+        val maxHalf = maxOf(smallPx, mediumPx, largePx) / 2f
         val hits = if (hitHolder != null) ArrayList<SmbCanvasHit>(points.size) else null
         with(context.mutableDrawScope) {
             for (point in points) {
+                val sizePx = when (smbSizeTierOf(point.amountUnits)) {
+                    SmbSizeTier.SMALL  -> smallPx
+                    SmbSizeTier.MEDIUM -> mediumPx
+                    SmbSizeTier.LARGE  -> largePx
+                }
+                val half = sizePx / 2f
+                val baseHalf = sizePx * 0.3f
                 val canvasX = context.dataXToCanvasX(point.x)
-                if (canvasX < context.layerBounds.left - half || canvasX > context.layerBounds.right + half) continue
+                if (canvasX < context.layerBounds.left - maxHalf || canvasX > context.layerBounds.right + maxHalf) continue
                 val canvasY =
                     context.layerBounds.bottom -
                         ((point.y - yRange.minY) / yRange.length).toFloat() * context.layerBounds.height
@@ -897,7 +930,9 @@ class SmbMarkersDecoration(
             points == other.points &&
             color == other.color &&
             outlineColor == other.outlineColor &&
-            size == other.size &&
+            smallSize == other.smallSize &&
+            mediumSize == other.mediumSize &&
+            largeSize == other.largeSize &&
             strokeWidth == other.strokeWidth &&
             hitHolder === other.hitHolder
 
@@ -905,7 +940,9 @@ class SmbMarkersDecoration(
         var result = points.hashCode()
         result = 31 * result + color.hashCode()
         result = 31 * result + outlineColor.hashCode()
-        result = 31 * result + size.hashCode()
+        result = 31 * result + smallSize.hashCode()
+        result = 31 * result + mediumSize.hashCode()
+        result = 31 * result + largeSize.hashCode()
         result = 31 * result + strokeWidth.hashCode()
         result = 31 * result + (hitHolder?.hashCode() ?: 0)
         return result
@@ -922,18 +959,20 @@ fun rememberSmbMarkers(
     points: List<SmbMarkerPoint>,
     color: Color,
     outlineColor: Color,
-    size: Dp,
+    smallSize: Dp,
+    mediumSize: Dp,
+    largeSize: Dp,
     strokeWidth: Dp,
     hitHolder: SmbHitPositionHolder? = null,
 ): SmbMarkersDecoration? {
-    return remember(points, color, outlineColor, size, strokeWidth, hitHolder) {
+    return remember(points, color, outlineColor, smallSize, mediumSize, largeSize, strokeWidth, hitHolder) {
         if (points.isEmpty()) {
             // Decoration is dropped, so clear the hit list here — otherwise a tap could hit a
             // triangle that is no longer on screen.
             hitHolder?.points = emptyList()
             null
         } else {
-            SmbMarkersDecoration(points, color, outlineColor, size, strokeWidth, hitHolder)
+            SmbMarkersDecoration(points, color, outlineColor, smallSize, mediumSize, largeSize, strokeWidth, hitHolder)
         }
     }
 }

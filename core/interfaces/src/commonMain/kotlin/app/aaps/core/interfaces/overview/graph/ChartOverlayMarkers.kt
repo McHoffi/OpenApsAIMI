@@ -1,10 +1,12 @@
 package app.aaps.core.interfaces.overview.graph
 
 /**
- * SMB marker on dashboard-style charts (time + label only; UI maps to geometry).
+ * SMB marker on dashboard-style charts (time + dose + label; UI maps to geometry).
  */
 data class ChartSmbMarker(
     val timestampEpochMs: Long,
+    /** Insulin amount in units — drives the triangle size tier. */
+    val amountUnits: Double,
     val amountLabel: String,
 )
 
