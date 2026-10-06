@@ -1,6 +1,7 @@
 package app.aaps.ui.compose.main
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -149,7 +150,11 @@ fun MainScreen(
     queueStatusText: AnnotatedString? = null,
     isPumpCommunicating: Boolean = false,
     onStopBolus: () -> Unit = {},
-    /** When non-null, replaces [OverviewScreen] with an embedded dashboard supplied by the app module. */
+    /**
+     * When non-null, replaces [OverviewScreen] with an embedded dashboard supplied by the app
+     * module. That view tree does not dispatch Compose nested scroll, so the skin gets tap-to-reveal
+     * and the idle hide only. Scroll auto-hide needs the Compose overview.
+     */
     dashboardOverview: (@Composable (PaddingValues, Dp) -> Unit)? = null,
     /** True only for the GLASS dashboard skin — swaps in [GlassNavigationBar] instead of the default
      *  [MainNavigationBar]. Does not affect OVERVIEW, which keeps using MainNavigationBar. */
@@ -214,24 +219,31 @@ fun MainScreen(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val density = LocalDensity.current
-            val previewMode = maxHeight < PREVIEW_MODE_MIN_HEIGHT
-            var chromeVisible by remember { mutableStateOf(false) }
-            val showChrome = !previewMode || chromeVisible
+            // Short windows (landscape phones) start with the bars hidden so the graph gets the
+            // full height. Taller windows start with the bars on screen.
+            val chrome = rememberChromeAutoHide(
+                initiallyVisible = maxHeight >= START_HIDDEN_MAX_HEIGHT
+            )
+            val showChrome = chrome.isVisible
 
-            // Measure actual bar heights for content padding in non-preview mode
+            // Latch measured bar heights. Never write 0 back — a transient 0 during
+            // AnimatedVisibility exit can schedule a remeasure on a node that is losing its
+            // owner and crash in dispatchDraw.
             var topBarHeightPx by remember { mutableIntStateOf(0) }
             var bottomBarHeightPx by remember { mutableIntStateOf(0) }
 
-            // Auto-hide chrome after timeout, reset when leaving preview mode
-            LaunchedEffect(chromeVisible, previewMode) {
-                if (!previewMode) {
-                    chromeVisible = false
-                    return@LaunchedEffect
-                }
-                if (chromeVisible) {
-                    delay(AUTO_HIDE_DELAY_MS)
-                    chromeVisible = false
-                }
+            // Pin while the user must see the top bar to get out of search or the drawer.
+            val chromePinned = searchUiState.isSearchActive || !drawerState.isClosed
+            LaunchedEffect(chromePinned) {
+                chrome.pin(chromePinned)
+            }
+
+            // Idle hide — only while shown and not pinned. Restarts whenever the bars are shown
+            // again or a pull at the top extends the peek.
+            LaunchedEffect(chrome.isVisible, chrome.showToken, chrome.isPinned) {
+                if (!chrome.isVisible || chrome.isPinned) return@LaunchedEffect
+                delay(AUTO_HIDE_DELAY_MS)
+                chrome.onIdleTimeout()
             }
 
             Scaffold { scaffoldPadding ->
@@ -239,17 +251,21 @@ fun MainScreen(
                 // Quick Launch toolbar would just float on top of them.
                 val hasToolbar = quickLaunchItems.isNotEmpty() && !isGlassSkin
 
-                // Content padding: in preview mode use only system bars;
-                // in normal mode add measured bar heights
-                val contentPadding = if (previewMode) scaffoldPadding
-                else {
-                    val topBarHeight = with(density) { topBarHeightPx.toDp() }
-                    val bottomBarHeight = with(density) { bottomBarHeightPx.toDp() }
-                    PaddingValues(
-                        top = scaffoldPadding.calculateTopPadding() + topBarHeight,
-                        bottom = scaffoldPadding.calculateBottomPadding() + bottomBarHeight
-                    )
-                }
+                // Content expands into the freed space when the bars hide.
+                val topBarHeight = with(density) { topBarHeightPx.toDp() }
+                val bottomBarHeight = with(density) { bottomBarHeightPx.toDp() }
+                val topBarPad by animateDpAsState(
+                    targetValue = if (showChrome) topBarHeight else 0.dp,
+                    label = "topBarPad",
+                )
+                val bottomBarPad by animateDpAsState(
+                    targetValue = if (showChrome) bottomBarHeight else 0.dp,
+                    label = "bottomBarPad",
+                )
+                val contentPadding = PaddingValues(
+                    top = scaffoldPadding.calculateTopPadding() + topBarPad,
+                    bottom = scaffoldPadding.calculateBottomPadding() + bottomBarPad
+                )
 
                 val activeSceneState by mainViewModel.activeSceneState.collectAsStateWithLifecycle()
                 val sceneExpired by mainViewModel.sceneExpired.collectAsStateWithLifecycle()
@@ -262,17 +278,16 @@ fun MainScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .chromeAutoHideScroll(chrome.controller)
                         .then(
-                            if (previewMode && !chromeVisible) {
+                            if (!showChrome) {
                                 // A modifier on THIS ancestor Box, not a separate full-screen sibling Box
                                 // drawn on top of the content: a stacked sibling claimed the whole gesture
-                                // stream and blocked scrolling in the dashboard below it (in preview mode,
-                                // which any landscape phone triggers, since landscape height is routinely
-                                // under PREVIEW_MODE_MIN_HEIGHT). On the ancestor, detectTapGestures backs
-                                // off once a descendant scrollable consumes the drag, so scrolling still
-                                // works and only a stationary tap reveals the chrome.
-                                Modifier.pointerInput(previewMode, chromeVisible) {
-                                    detectTapGestures(onTap = { chromeVisible = true })
+                                // stream and blocked scrolling in the dashboard below it. On the ancestor,
+                                // detectTapGestures backs off once a descendant scrollable consumes the
+                                // drag, so scrolling still works and only a stationary tap reveals the bars.
+                                Modifier.pointerInput(showChrome) {
+                                    detectTapGestures(onTap = { chrome.onRevealTap() })
                                 }
                             } else {
                                 Modifier
@@ -606,5 +621,6 @@ fun MainScreen(
     }
 }
 
-private val PREVIEW_MODE_MIN_HEIGHT: Dp = 500.dp
+/** Windows shorter than this start with the bars hidden so the graph gets the full height. */
+private val START_HIDDEN_MAX_HEIGHT: Dp = 500.dp
 private const val AUTO_HIDE_DELAY_MS = 3000L
