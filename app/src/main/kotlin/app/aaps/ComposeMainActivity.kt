@@ -1360,9 +1360,16 @@ class ComposeMainActivity : MetroAppCompatActivity() {
             ElementType.EXTENDED_BOLUS          -> navController.navigate(AppRoute.ExtendedBolusDialog.route)
 
             // CGM
-            ElementType.CGM_XDRIP               -> if (!openCgmApp("com.eveningoutpost.dexdrip")) openCgmApp("tk.glucodata")
-            ElementType.CGM_DEX                 -> dexcomBoyda.dexcomPackages().forEach { openCgmApp(it) }
+            ElementType.CGM_XDRIP               -> openCgmApp("com.eveningoutpost.dexdrip") ||
+                                                    openCgmApp("tk.glucodata") ||
+                                                    openCgmApp("tk.glucodata.ng")
+            ElementType.CGM_DEX                 -> {
+                for (packageName in dexcomBoyda.dexcomPackages()) {
+                    if (openCgmApp(packageName)) break
+                }
+            }
             ElementType.CGM_JUGGLUCO            -> openCgmApp("tk.glucodata")
+            ElementType.CGM_JUGGLUCO_NG         -> openCgmApp("tk.glucodata.ng")
 
             ElementType.CALIBRATION             -> navController.navigate(AppRoute.CalibrationDialog.route)
             ElementType.EVERSENSE_CALIBRATION   -> navController.navigate(AppRoute.EversenseCalibrationDialog.route)

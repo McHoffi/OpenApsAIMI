@@ -75,6 +75,7 @@ fun ElementType.color(): Color = when (this) {
     ElementType.CGM_XDRIP               -> AapsTheme.elementColors.cgmXdrip
     ElementType.CGM_DEX                 -> AapsTheme.elementColors.cgmDex
     ElementType.CGM_JUGGLUCO            -> AapsTheme.elementColors.cgmXdrip
+    ElementType.CGM_JUGGLUCO_NG         -> AapsTheme.elementColors.cgmXdrip
     ElementType.CALIBRATION             -> AapsTheme.elementColors.calibration
     ElementType.EVERSENSE_CALIBRATION   -> AapsTheme.elementColors.calibration
     ElementType.INSULIN_MANAGEMENT      -> AapsTheme.elementColors.insulin
@@ -145,6 +146,7 @@ fun ElementType.icon(): ImageVector = when (this) {
     ElementType.CGM_XDRIP               -> IcXDrip
     ElementType.CGM_DEX                 -> IcByoda
     ElementType.CGM_JUGGLUCO            -> IcGenericCgm
+    ElementType.CGM_JUGGLUCO_NG         -> IcGenericCgm
     ElementType.CALIBRATION             -> IcCalibration
     ElementType.EVERSENSE_CALIBRATION   -> IcCalibration
     ElementType.INSULIN_MANAGEMENT      -> IcPluginInsulin
@@ -220,6 +222,7 @@ fun ElementType.label(): TextRef? = when (this) {
     ElementType.CGM_XDRIP               -> CoreUiStrings.cgm
     ElementType.CGM_DEX                 -> CoreUiStrings.cgm
     ElementType.CGM_JUGGLUCO            -> CoreUiStrings.cgm
+    ElementType.CGM_JUGGLUCO_NG         -> CoreUiStrings.cgm
     ElementType.CALIBRATION             -> CoreUiStrings.calibration
     ElementType.EVERSENSE_CALIBRATION   -> CoreUiStrings.eversense_calibration_label
     ElementType.INSULIN_MANAGEMENT      -> CoreUiStrings.insulin_management
@@ -284,7 +287,8 @@ fun ElementType.description(): TextRef? = when (this) {
     ElementType.QUESTION                -> CoreUiStrings.treatment_question_desc
     ElementType.CGM_XDRIP,
     ElementType.CGM_DEX,
-    ElementType.CGM_JUGGLUCO            -> CoreUiStrings.treatment_cgm_desc
+    ElementType.CGM_JUGGLUCO,
+    ElementType.CGM_JUGGLUCO_NG         -> CoreUiStrings.treatment_cgm_desc
 
     ElementType.CALIBRATION             -> CoreUiStrings.treatment_calibration_desc
     ElementType.EVERSENSE_CALIBRATION   -> CoreUiStrings.treatment_eversense_calibration_desc

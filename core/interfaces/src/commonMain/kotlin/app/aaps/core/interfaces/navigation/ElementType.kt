@@ -37,6 +37,7 @@ enum class ElementType(
     // CALIBRATION is intentionally NOT migrated/gated: it's a CGM-plugin command (activeCalibration.addEntry), not a
     // DB write, and a client has no CGM source to calibrate — so it stays local/master-only (see Track B calibration notes).
     CGM_JUGGLUCO(category = ElementCategory.CGM, searchable = true),
+    CGM_JUGGLUCO_NG(category = ElementCategory.CGM, searchable = true),
     CALIBRATION(category = ElementCategory.CGM, searchable = true),
 
     // Eversense's own calibration: writes a fingerstick value straight to the transmitter over

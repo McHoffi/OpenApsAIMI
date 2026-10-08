@@ -36,6 +36,8 @@
 
     <!-- To receive data from xdrip. -->
     <uses-permission android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE" />
+    <uses-permission android:name="tk.glucodata.permissions.RECEIVE_BG_ESTIMATE" />
+    <uses-permission android:name="tk.glucodata.ng.permissions.RECEIVE_BG_ESTIMATE" />
 
     <!-- To receive data from Aidex -->
     <uses-permission android:name="com.microtechmd.cgms.aidex.permissions.RECEIVE_BG_ESTIMATE" />

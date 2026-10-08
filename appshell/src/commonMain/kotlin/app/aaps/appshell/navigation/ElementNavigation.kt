@@ -151,6 +151,7 @@ class ElementNavigator(
             ElementType.CGM_XDRIP               -> onOpenCgmApp("com.eveningoutpost.dexdrip")
             ElementType.CGM_DEX                 -> dexcomBoyda.dexcomPackages().forEach { onOpenCgmApp(it) }
             ElementType.CGM_JUGGLUCO            -> onOpenCgmApp("tk.glucodata")
+            ElementType.CGM_JUGGLUCO_NG         -> onOpenCgmApp("tk.glucodata.ng")
 
             ElementType.CALIBRATION             -> navController.navigate(AppRoute.CalibrationDialog.route)
             ElementType.EVERSENSE_CALIBRATION   -> navController.navigate(AppRoute.EversenseCalibrationDialog.route)
