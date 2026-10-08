@@ -303,7 +303,11 @@ fun aapsAppViewController(nsSocketFactory: NsSocketFactory): UIViewController {
                     configBuilder = graph.configBuilder,
                     dexcomBoyda = graph.dexcomBoyda,
                     // The Dexcom build is an Android app; an iOS client reads glucose from Nightscout.
-                    onOpenCgmApp = { pkg -> reportNotAvailable("open CGM app $pkg") },
+                    // No package would open, so say so once and stop the fallback chain.
+                    onOpenCgmApp = { pkg ->
+                        reportNotAvailable("open CGM app $pkg")
+                        true
+                    },
                     // iOS gives an app no way to quit itself, and Apple treats that as a crash.
                     onExit = { reportNotAvailable("exit from the menu") },
                     // Needs a UIDocumentPicker, which nothing on iOS has yet.

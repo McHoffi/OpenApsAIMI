@@ -31,8 +31,9 @@ import app.aaps.ui.compose.fillDialog.FillPreselect
  * Two things genuinely are platform specific and are passed in: launching another app for a CGM, and
  * closing the app. Everything else is shared.
  *
- * @param onOpenCgmApp opens the CGM app by package name. Android only; elsewhere there is no app to
- *   open, and the caller should say so rather than doing nothing quietly.
+ * @param onOpenCgmApp opens the CGM app by package name. Returns true when an app was opened, or
+ *   when another package would not help. A missing package returns false so the next one can be
+ *   tried. Other platforms have no app to open: say so, then return true to stop the chain.
  * @param onExit closes the window or activity. Called **before** `configBuilder.exitApp`, which is
  *   what the phone did: the UI goes first, then the app records the exit and stops the process.
  */
@@ -44,7 +45,7 @@ class ElementNavigator(
     val protectionCheck: ProtectionCheck,
     private val configBuilder: ConfigBuilder,
     private val dexcomBoyda: DexcomBoyda,
-    private val onOpenCgmApp: (packageName: String) -> Unit,
+    private val onOpenCgmApp: (packageName: String) -> Boolean,
     private val onExit: () -> Unit,
     val onRequestDirectoryAccess: () -> Unit,
     val onOpenUrl: (url: String) -> Unit
@@ -148,8 +149,14 @@ class ElementNavigator(
             ElementType.EXTENDED_BOLUS          -> navController.navigate(AppRoute.ExtendedBolusDialog.route)
 
             // CGM
-            ElementType.CGM_XDRIP               -> onOpenCgmApp("com.eveningoutpost.dexdrip")
-            ElementType.CGM_DEX                 -> dexcomBoyda.dexcomPackages().forEach { onOpenCgmApp(it) }
+            ElementType.CGM_XDRIP               -> onOpenCgmApp("com.eveningoutpost.dexdrip") ||
+                                                    onOpenCgmApp("tk.glucodata") ||
+                                                    onOpenCgmApp("tk.glucodata.ng")
+            ElementType.CGM_DEX                 -> {
+                for (packageName in dexcomBoyda.dexcomPackages()) {
+                    if (onOpenCgmApp(packageName)) break
+                }
+            }
             ElementType.CGM_JUGGLUCO            -> onOpenCgmApp("tk.glucodata")
             ElementType.CGM_JUGGLUCO_NG         -> onOpenCgmApp("tk.glucodata.ng")
 

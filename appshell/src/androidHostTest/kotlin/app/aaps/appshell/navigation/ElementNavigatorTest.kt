@@ -39,6 +39,7 @@ class ElementNavigatorTest {
     private lateinit var dexcomBoyda: DexcomBoyda
 
     private val openedCgmApps = mutableListOf<String>()
+    private val missingCgmApps = mutableSetOf<String>()
     private var exited = false
 
     private lateinit var sut: ElementNavigator
@@ -52,6 +53,7 @@ class ElementNavigatorTest {
         configBuilder = mock()
         dexcomBoyda = mock()
         openedCgmApps.clear()
+        missingCgmApps.clear()
         exited = false
         sut = ElementNavigator(
             navController = navController,
@@ -60,7 +62,10 @@ class ElementNavigatorTest {
             protectionCheck = protectionCheck,
             configBuilder = configBuilder,
             dexcomBoyda = dexcomBoyda,
-            onOpenCgmApp = { openedCgmApps += it },
+            onOpenCgmApp = { packageName ->
+                openedCgmApps += packageName
+                packageName !in missingCgmApps
+            },
             onExit = { exited = true },
             onRequestDirectoryAccess = {},
             onOpenUrl = {}
@@ -269,7 +274,7 @@ class ElementNavigatorTest {
     }
 
     @Test
-    fun `the xdrip element opens the xdrip package`() {
+    fun `the xdrip element opens the xdrip package when it is installed`() {
         grantAuthorization(ProtectionCheck.Protection.MASTER)
 
         sut.handleNavigationRequest(NavigationRequest.Element(ElementType.CGM_XDRIP))
@@ -278,9 +283,35 @@ class ElementNavigatorTest {
     }
 
     @Test
-    fun `the dexcom element opens every package the source reports`() {
+    fun `the xdrip element falls through the packages until one opens`() {
+        grantAuthorization(ProtectionCheck.Protection.MASTER)
+        missingCgmApps += "com.eveningoutpost.dexdrip"
+        missingCgmApps += "tk.glucodata"
+
+        sut.handleNavigationRequest(NavigationRequest.Element(ElementType.CGM_XDRIP))
+
+        assertThat(openedCgmApps).containsExactly(
+            "com.eveningoutpost.dexdrip",
+            "tk.glucodata",
+            "tk.glucodata.ng"
+        ).inOrder()
+    }
+
+    @Test
+    fun `the dexcom element stops at the first package that opens`() {
         grantAuthorization(ProtectionCheck.Protection.MASTER)
         whenever(dexcomBoyda.dexcomPackages()).thenReturn(listOf("com.dexcom.g6", "com.dexcom.g7"))
+
+        sut.handleNavigationRequest(NavigationRequest.Element(ElementType.CGM_DEX))
+
+        assertThat(openedCgmApps).containsExactly("com.dexcom.g6")
+    }
+
+    @Test
+    fun `the dexcom element tries the next package when one is missing`() {
+        grantAuthorization(ProtectionCheck.Protection.MASTER)
+        whenever(dexcomBoyda.dexcomPackages()).thenReturn(listOf("com.dexcom.g6", "com.dexcom.g7"))
+        missingCgmApps += "com.dexcom.g6"
 
         sut.handleNavigationRequest(NavigationRequest.Element(ElementType.CGM_DEX))
 
