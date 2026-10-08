@@ -1,10 +1,5 @@
 package app.aaps.workflow
 
-import app.aaps.core.objects.workflow.WorkOutcome
-import dev.zacsweers.metro.Inject
-import kotlin.time.Instant
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.TimeZone
 import app.aaps.core.data.aps.SMBDefaults
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.model.CA
@@ -23,7 +18,6 @@ import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
-import app.aaps.core.interfaces.overview.OverviewData
 import app.aaps.core.interfaces.overview.graph.AbsIobGraphData
 import app.aaps.core.interfaces.overview.graph.AcceIsfGraphData
 import app.aaps.core.interfaces.overview.graph.ActivityGraphData
@@ -65,14 +59,19 @@ import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.extensions.combine
+import app.aaps.core.objects.workflow.WorkOutcome
 import app.aaps.workflow.iob.fromCarbs
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
+import kotlin.time.Instant
 
 /**
  * Merged worker covering: BG load+smooth, bucketed data prep, BG readings prep,

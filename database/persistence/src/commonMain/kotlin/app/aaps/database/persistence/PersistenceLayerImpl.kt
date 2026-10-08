@@ -137,14 +137,14 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlin.reflect.KClass
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlin.reflect.KClass
+import kotlin.time.Duration.Companion.milliseconds
 
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
@@ -169,9 +169,8 @@ class PersistenceLayerImpl(
     override suspend fun clearDatabases() = repository.clearDatabases()
     override fun databaseClearedFlow(): Flow<Unit> = repository.databaseClearedFlow()
     override suspend fun clearApsResults() = repository.clearApsResults()
-    override suspend fun cleanupDatabase(keepDays: Long, deleteTrackedChanges: Boolean, runVacuum: Boolean): String = withContext(aapsIoDispatcher) {
-        val result = repository.cleanupDatabase(keepDays, deleteTrackedChanges, runVacuum)
-        result
+    override suspend fun cleanupDatabase(olderThan: Long, deleteTrackedChanges: Boolean, runVacuum: Boolean): String = withContext(aapsIoDispatcher) {
+        repository.cleanupDatabase(olderThan, deleteTrackedChanges, runVacuum)
     }
 
     override suspend fun maintainDatabaseAtStartup() = withContext(aapsIoDispatcher) {

@@ -1,12 +1,11 @@
 package app.aaps.e2e
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.aaps.core.interfaces.configuration.ExternalOptions
+import app.aaps.di.EmulatedOptions
 import app.aaps.di.ResetGraphRule
 import app.aaps.di.testGraphs
 import app.aaps.pump.danars.di.DanaRSAccessors
-import app.aaps.core.interfaces.configuration.ExternalOptions
-import app.aaps.core.interfaces.pump.ble.BleTransport
-import app.aaps.di.EmulatedOptions
 import app.aaps.pump.danars.emulator.EmulatorBleTransport
 import app.aaps.testcategories.ShardB
 import com.google.common.truth.Truth.assertThat
@@ -16,6 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import app.aaps.core.interfaces.pump.ble.BleTransport
 
 /**
  * Proves the seam that lets an instrumented test drive a real pump driver against the in-tree pump

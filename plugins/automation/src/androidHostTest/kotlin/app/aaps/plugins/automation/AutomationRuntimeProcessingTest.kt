@@ -21,7 +21,6 @@ import app.aaps.plugins.automation.triggers.TriggerBTDevice
 import app.aaps.plugins.automation.triggers.TriggerConnector
 import app.aaps.plugins.automation.triggers.TriggerDeps
 import app.aaps.plugins.automation.triggers.TriggerFactory
-import app.aaps.plugins.automation.AutomationStringsValues
 import app.aaps.shared.tests.TestBaseWithProfile
 import app.aaps.shared.tests.generatedTextResolver
 import com.google.common.truth.Truth.assertThat
@@ -47,6 +46,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import app.aaps.plugins.automation.AutomationStringsValues
 
 /**
  * When `AutomationRuntime` runs its rules, and that two runs never overlap. Issue #5137.

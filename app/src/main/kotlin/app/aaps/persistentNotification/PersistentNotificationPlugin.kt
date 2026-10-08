@@ -69,10 +69,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlin.math.round
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlin.time.Duration.Companion.seconds
 import android.app.NotificationManager as AndroidNotificationManager
+import kotlin.math.round
 
 @Suppress("PrivatePropertyName", "DEPRECATION")
 // Registers itself into the every-build plugin bucket at order 0, replacing the @Binds @IntKey(0) in

@@ -5,9 +5,9 @@ import app.aaps.core.interfaces.di.injectMetroMembers
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventWearToMobile
 import app.aaps.core.interfaces.rx.weardata.EventData
-import app.aaps.wear.di.WearMetroService
 import app.aaps.wear.tile.source.RunningModeSource
 import dev.zacsweers.metro.Inject
+import app.aaps.wear.di.WearMetroService
 
 class RunningModeTileService : TileBase() {
 

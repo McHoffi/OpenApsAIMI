@@ -1,5 +1,6 @@
 package app.aaps.di.metro
 
+import app.aaps.core.interfaces.di.FeatureMemberInjectors
 import app.aaps.implementation.androidNotification.AlarmMuteReceiver
 import app.aaps.implementation.androidNotification.HypoTreatedReceiver
 import app.aaps.implementation.receivers.BTReceiver
@@ -11,7 +12,6 @@ import app.aaps.receivers.AutoStartReceiver
 import app.aaps.receivers.CarbSuggestionReceiver
 import app.aaps.receivers.DataReceiver
 import app.aaps.receivers.SmsReceiver
-import app.aaps.core.interfaces.di.FeatureMemberInjectors
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ClassKey

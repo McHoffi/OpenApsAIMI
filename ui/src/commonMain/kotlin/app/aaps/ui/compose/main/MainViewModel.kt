@@ -48,9 +48,9 @@ import app.aaps.core.interfaces.rx.events.EventShowDialog
 import app.aaps.core.interfaces.scenes.ActiveSceneSync
 import app.aaps.core.interfaces.scenes.SceneActions
 import app.aaps.core.interfaces.scenes.SceneChainResolver
+import app.aaps.core.interfaces.scenes.SceneStore
 import app.aaps.core.interfaces.sync.NsClient
 import app.aaps.core.interfaces.ui.UrlOpener
-import app.aaps.core.interfaces.ui.IconsProvider
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.BooleanKey
@@ -90,7 +90,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -109,6 +108,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 // Registers itself: @ViewModelKey infers the key from the class. No graph entry, and deliberately
 // unscoped so each screen gets its own.
@@ -140,6 +140,7 @@ class MainViewModel(
     private val protectionCheck: ProtectionCheck,
     private val sceneActions: SceneActions,
     private val sceneChainTargetResolver: SceneChainResolver,
+    private val sceneStore: SceneStore,
     private val activeSceneManager: ActiveSceneSync,
     private val rxBus: RxBus,
     private val nsClient: NsClient,
@@ -421,6 +422,10 @@ class MainViewModel(
         val carbsAfterConstraints = constraintChecker.applyCarbsConstraints(ConstraintObject(entry.carbs(), aapsLogger)).value()
         if (carbsAfterConstraints != entry.carbs())
             return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, detail = detail, disabledReason = rh.gs(UiStrings.carbs_constraint_violation))
+        // The eCarbs amount is stored in the preset, so the limit may have been lowered since it was entered.
+        val eCarbs = entry.eCarbsGrams()
+        if (constraintChecker.applyCarbsConstraints(ConstraintObject(eCarbs, aapsLogger)).value() != eCarbs)
+            return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, detail = detail, disabledReason = rh.gs(UiStrings.carbs_constraint_violation))
 
         return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, detail = detail, isEnabled = true)
     }
@@ -460,6 +465,10 @@ class MainViewModel(
 
         val carbsAfterConstraints = constraintChecker.applyCarbsConstraints(ConstraintObject(entry.carbs(), aapsLogger)).value()
         if (carbsAfterConstraints != entry.carbs())
+            return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, detail = detail, disabledReason = rh.gs(UiStrings.carbs_constraint_violation))
+        // The eCarbs amount is stored in the preset, so the limit may have been lowered since it was entered.
+        val eCarbs = entry.eCarbsGrams()
+        if (constraintChecker.applyCarbsConstraints(ConstraintObject(eCarbs, aapsLogger)).value() != eCarbs)
             return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, detail = detail, disabledReason = rh.gs(UiStrings.carbs_constraint_violation))
         val minStep = pump.pumpDescription.pumpType.determineCorrectBolusStepSize(wizard.insulinAfterConstraints)
         if (abs(wizard.insulinAfterConstraints - wizard.calculatedTotalInsulin) >= minStep)
@@ -558,7 +567,7 @@ class MainViewModel(
             listOf(BatchAction.Bolus(
                 insulin = 0.0, carbs = carbs, carbsTimeOffsetMinutes = 0, carbsDurationHours = 0,
                 recordOnly = false, notes = entry.buttonText(), timestamp = 0L, iCfg = null,
-                eCarbsGrams = if (hasEcarbs) entry.carbs2() else 0,
+                eCarbsGrams = entry.eCarbsGrams(),
                 eCarbsDelayMinutes = if (hasEcarbs) entry.time() else 0,
                 eCarbsDurationHours = if (hasEcarbs) entry.duration() else 0
             )),
@@ -800,6 +809,20 @@ class MainViewModel(
 
     /** Expose active scene state for UI (banner, etc.) */
     val activeSceneState: StateFlow<ActiveSceneState?> = activeSceneManager.activeSceneState
+
+    /**
+     * Name of the scene that starts when the active one ends, for the banner. A catalog lookup only:
+     * whether the follow-up can run is decided when this scene ends, not now.
+     *
+     * Recomputed on every catalog change as well, not only when the active scene changes: the edit
+     * lock covers the running scene but not its follow-up, so that one can be renamed, disabled or
+     * deleted while the banner is on screen (and on a client the catalog arrives by sync). A banner
+     * naming a follow-up that no longer exists would promise something that will not start.
+     */
+    val activeSceneChainTargetName: StateFlow<String?> =
+        combine(activeSceneManager.activeSceneState, sceneStore.scenesFlow) { state, _ ->
+            state?.let { sceneChainTargetResolver.resolveCatalogChainTarget(it.scene)?.name }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Whether the active scene has expired (duration ran out, non-duration actions reverted).
      *  Derived from the lifecycle field that lives inside [ActiveSceneState] and rides NS sync. */

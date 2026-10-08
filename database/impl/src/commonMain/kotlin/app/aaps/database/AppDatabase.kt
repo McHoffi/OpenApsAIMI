@@ -49,7 +49,8 @@ import app.aaps.database.entities.TotalDailyDose
 import app.aaps.database.entities.UserEntry
 import app.aaps.database.entities.VersionChange
 
-const val DATABASE_VERSION = 37
+// Fork schema chain (not upstream's). 36to37 added calibrationEntries; 37to38 rewrites sourceSensor.
+const val DATABASE_VERSION = 38
 
 @Database(
     version = DATABASE_VERSION,

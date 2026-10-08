@@ -24,7 +24,6 @@ import app.aaps.core.interfaces.insulin.ConcentrationHelper
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.implementation.maintenance.PeriodicMaintenance
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.queue.Command
@@ -34,11 +33,11 @@ import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventProfileChangeRequested
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
-import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.objects.workflow.LoggingWorker
 import app.aaps.core.objects.workflow.MetroWorkerCreator
+import app.aaps.implementation.maintenance.PeriodicMaintenance
 import com.google.common.util.concurrent.ListenableFuture
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -172,16 +171,8 @@ class KeepAliveWorker(
     }
 
     // Fork invariant gate: the daily retention trim never runs VACUUM inline (SQLITE_NOMEM risk).
-    // Upstream moved the trim into PeriodicMaintenance; the `runVacuum = false` default on the
-    // interface keeps that path vacuum-free. Kept here as documentation of the constraint.
-    private suspend fun databaseCleanup() {
-        val lastRun = preferences.get(LongNonKey.LastCleanupRun)
-        if (lastRun < dateUtil.now() - T.days(1).msecs()) {
-            val result = persistenceLayer.cleanupDatabase(6 * 31, deleteTrackedChanges = false, runVacuum = false)
-            aapsLogger.debug(LTag.CORE, "Cleanup result: $result")
-            preferences.put(LongNonKey.LastCleanupRun, dateUtil.now())
-        }
-    }
+    // The trim lives in PeriodicMaintenance.cleanupDatabase (called from runOnce above), which uses
+    // the `runVacuum = false` default on the interface. Do not add a second cleanup call here.
 
     // When Worker DB grows too much, work operations become slow
     // Library is cleaning DB every 7 days which may not be sufficient for NSClient full sync

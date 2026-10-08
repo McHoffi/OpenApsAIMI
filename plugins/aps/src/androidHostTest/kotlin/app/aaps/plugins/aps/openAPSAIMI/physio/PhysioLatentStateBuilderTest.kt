@@ -92,7 +92,7 @@ class PhysioLatentStateBuilderTest {
                 confidence = 0.82,
                 isValid = true,
             ),
-            sourceSensor = SourceSensor.DEXCOM_G6_NATIVE,
+            sourceSensor = SourceSensor.DEXCOM_G6,
             phaseOutput = phaseOutput(
                 phase = PhysiologicalPhase.DAWN_CORTISOL,
                 confidence = 0.84,
@@ -184,7 +184,7 @@ class PhysioLatentStateBuilderTest {
                 confidence = 0.90,
                 isValid = true,
             ),
-            sourceSensor = SourceSensor.DEXCOM_G7_NATIVE,
+            sourceSensor = SourceSensor.DEXCOM_G7,
             phaseOutput = phaseOutput(
                 phase = PhysiologicalPhase.STRESS_CORTISOL,
                 confidence = 0.80,

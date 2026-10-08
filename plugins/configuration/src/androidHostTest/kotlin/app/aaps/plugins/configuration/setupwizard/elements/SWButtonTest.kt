@@ -1,6 +1,5 @@
 package app.aaps.plugins.configuration.setupwizard.elements
 
-import app.aaps.core.ui.CoreUiStrings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -11,7 +10,7 @@ import app.aaps.core.interfaces.protection.PasswordCheck
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.ui.R
+import app.aaps.core.ui.CoreUiStrings
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
@@ -22,6 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import app.aaps.core.ui.R
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

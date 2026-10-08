@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import app.aaps.core.data.time.T
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.db.PersistenceLayer
@@ -156,7 +157,7 @@ class NSClientFragment : Fragment(), MenuProvider, PluginFragment {
                                 viewLifecycleOwner.lifecycleScope.launch {
                                     try {
                                         val result = withContext(Dispatchers.IO) {
-                                            persistenceLayer.cleanupDatabase(93, deleteTrackedChanges = true, runVacuum = true)
+                                            persistenceLayer.cleanupDatabase(dateUtil.now() - T.days(93).msecs(), deleteTrackedChanges = true, runVacuum = true)
                                         }
                                         if (result.isNotEmpty()) {
                                             OKDialog.show(

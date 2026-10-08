@@ -23,11 +23,11 @@ import app.aaps.plugins.main.iob.iobCobCalculator.IobCobCalculatorPlugin
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
-import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.IntKey
 import dev.zacsweers.metro.IntoMap
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.Inject
 
 /**
  * The live loop's `IobCobCalculatorPlugin`, replacing the hand-construction in `MainPluginsModule`.

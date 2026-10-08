@@ -8,6 +8,7 @@ import app.aaps.core.ui.compose.preference.SectionLevel
 import app.aaps.core.ui.compose.preference.addPreferenceContent
 import app.aaps.core.ui.compose.preference.rememberPreferenceSectionState
 import app.aaps.core.ui.compose.preference.verticalScrollIndicators
+import app.aaps.core.ui.compose.stringResource
 import kotlinx.coroutines.launch
 
 /**

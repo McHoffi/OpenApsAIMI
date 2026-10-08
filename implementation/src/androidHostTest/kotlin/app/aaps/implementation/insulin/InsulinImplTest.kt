@@ -10,7 +10,6 @@ import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.shared.tests.TestBase
 import app.aaps.shared.tests.generatedTextResolver
 import com.google.common.truth.Truth.assertThat
@@ -24,6 +23,7 @@ import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import kotlin.reflect.KClass
+import app.aaps.core.keys.interfaces.TextRef
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InsulinImplTest : TestBase() {

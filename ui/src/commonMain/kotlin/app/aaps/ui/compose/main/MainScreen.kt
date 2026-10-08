@@ -54,7 +54,6 @@ import app.aaps.core.ui.compose.dialogs.ThreeButtonDialog
 import app.aaps.core.ui.compose.navigation.NavigationRequest
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.core.ui.compose.stringResource
-import app.aaps.ui.UiStrings
 import app.aaps.ui.compose.aboutDialog.AboutAlertDialog
 import app.aaps.ui.compose.aboutDialog.AboutDialogData
 import app.aaps.ui.compose.loopSheet.LoopActionViewModel
@@ -269,6 +268,7 @@ fun MainScreen(
 
                 val activeSceneState by mainViewModel.activeSceneState.collectAsStateWithLifecycle()
                 val sceneExpired by mainViewModel.sceneExpired.collectAsStateWithLifecycle()
+                val activeSceneChainTargetName by mainViewModel.activeSceneChainTargetName.collectAsStateWithLifecycle()
                 val masterReachable by mainViewModel.masterReachable.collectAsStateWithLifecycle()
                 // Stable pairing signal — hides the mutating nav buttons on an unpaired client.
                 val masterOrPairedClient by mainViewModel.masterOrPairedClient.collectAsStateWithLifecycle()
@@ -324,6 +324,7 @@ fun MainScreen(
                         onAutoShowConsumed = onAutoShowConsumed,
                         activeSceneState = activeSceneState,
                         sceneExpired = sceneExpired,
+                        activeSceneChainTargetName = activeSceneChainTargetName,
                         onEndScene = { mainViewModel.requestSceneDeactivation() },
                         onDismissScene = { mainViewModel.dismissExpiredScene() },
                         endSceneEnabled = masterReachable,

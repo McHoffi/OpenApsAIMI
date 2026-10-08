@@ -51,7 +51,6 @@ import app.aaps.core.ui.compose.metroViewModel
 import app.aaps.core.ui.compose.navigation.label
 import app.aaps.core.ui.compose.stringResource
 import app.aaps.core.ui.compose.stringResourceOrNull
-import app.aaps.ui.UiStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,11 +171,7 @@ fun SceneListScreen(
                     items(scenes, key = { it.id }) { scene ->
                         val isActive = activeState?.scene?.id == scene.id
                         val isInvalid = scene.id in invalidSceneIds
-                        val subtitle = stringResource(
-                            CoreUiStrings.scene_summary,
-                            scene.actions.size,
-                            viewModel.formatMinutes(scene.defaultDurationMinutes)
-                        )
+                        val subtitle = viewModel.summary(scene)
                         val chainTargetId = (scene.endAction as? SceneEndAction.ChainScene)?.sceneId
                         val chainTargetName = chainTargetId?.let { id -> scenes.firstOrNull { it.id == id }?.name }
                         SceneCard(

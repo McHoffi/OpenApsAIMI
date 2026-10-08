@@ -191,6 +191,7 @@ data class UserEntry(
         DanaRv2,
         DanaRS,
         DanaI,
+        DanaI2,
         DiaconnG8,
         Insight,
         Combo,

@@ -3,13 +3,12 @@ package app.aaps.plugins.automation
 import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
-import app.aaps.plugins.automation.AutomationStringsValues
-import app.aaps.shared.tests.generatedTextResolver
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.Event
 import app.aaps.core.interfaces.rx.events.EventShowSnackbar
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.shared.tests.TestBase
+import app.aaps.shared.tests.generatedTextResolver
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,6 +24,7 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import app.aaps.plugins.automation.AutomationStringsValues
 
 /**
  * Covers the Android implementation of [app.aaps.core.interfaces.alerts.ReminderScheduler].

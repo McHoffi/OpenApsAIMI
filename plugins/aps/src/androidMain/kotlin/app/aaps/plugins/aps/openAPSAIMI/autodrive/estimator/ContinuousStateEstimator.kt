@@ -153,7 +153,7 @@ class ContinuousStateEstimator @Inject constructor(
         // 🚀 LEAD COMPENSATOR (Phase 10 - Hardware-Awareness)
         // Le capteur Dexcom G6 possède un lag matériel (lissage natif) qui écrase et retarde la dérivée.
         // Si détecté, on booste l'accélération perçue pour réagir en temps réel comme le One+
-        val isG6 = actualState.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6_NATIVE
+        val isG6 = actualState.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6
         val hardwareCompensatedVelocity = if (isG6 && actualState.bgVelocity > 0.5) {
             actualState.bgVelocity * 1.25 // +25% lead (Total lead with orchestrator = +50%)
         } else {

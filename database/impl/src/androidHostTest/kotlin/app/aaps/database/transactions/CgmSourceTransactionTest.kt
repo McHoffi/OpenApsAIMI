@@ -34,7 +34,7 @@ class CgmSourceTransactionTest {
     fun `inserts new glucose value when not found`() = runTest {
         val gv = createGlucoseValue(timestamp = 1000L, value = 120.0)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(null)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(null)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null)
         transaction.database = database
@@ -51,7 +51,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = 1000L, value = 130.0)
         val existing = createGlucoseValue(timestamp = 1000L, value = 120.0)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null)
         transaction.database = database
@@ -68,7 +68,7 @@ class CgmSourceTransactionTest {
         val staleEchoFromNs = createGlucoseValue(timestamp = 1000L, value = 110.0)
         val existing = createGlucoseValue(timestamp = 1000L, value = 160.0)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(staleEchoFromNs), emptyList(), null, fromNsClient = true)
         transaction.database = database
@@ -83,7 +83,7 @@ class CgmSourceTransactionTest {
         val staleEchoFromNs = createGlucoseValue(timestamp = 1000L, value = 110.0, nsId = "ns-123")
         val existing = createGlucoseValue(timestamp = 1000L, value = 160.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(staleEchoFromNs), emptyList(), null, fromNsClient = true)
         transaction.database = database
@@ -99,7 +99,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = 1000L, value = 120.0, nsId = "ns-123")
         val existing = createGlucoseValue(timestamp = 1000L, value = 120.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null)
         transaction.database = database
@@ -116,7 +116,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = 1000L, value = 120.0, nsId = null)
         val existing = createGlucoseValue(timestamp = 1000L, value = 120.0, nsId = "ns-123")
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null)
         transaction.database = database
@@ -130,7 +130,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = 1000L, value = 120.0, isValid = true)
         val existing = createGlucoseValue(timestamp = 1000L, value = 120.0, isValid = false)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null)
         transaction.database = database
@@ -212,8 +212,8 @@ class CgmSourceTransactionTest {
         val gv1 = createGlucoseValue(timestamp = 1000L, value = 120.0)
         val gv2 = createGlucoseValue(timestamp = 2000L, value = 125.0)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(null)
-        whenever(glucoseValueDao.findByTimestampAndSensor(2000L, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(null)
+        whenever(glucoseValueDao.findByTimestampAndSensor(1000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(null)
+        whenever(glucoseValueDao.findByTimestampAndSensor(2000L, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(null)
 
         val transaction = CgmSourceTransaction(listOf(gv1, gv2), emptyList(), null)
         transaction.database = database
@@ -229,7 +229,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = timestamp, value = 77.0, nsId = "ns-123")
         val existing = createGlucoseValue(timestamp = timestamp, value = 71.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null, fromNsClient = true)
         transaction.database = database
@@ -249,7 +249,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = timestamp, value = 71.0, nsId = "ns-123")
         val existing = createGlucoseValue(timestamp = timestamp, value = 71.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null, fromNsClient = true)
         transaction.database = database
@@ -268,7 +268,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = timestamp, value = 77.0, nsId = "ns-123")
         val existing = createGlucoseValue(timestamp = timestamp, value = 71.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null, fromNsClient = true)
         transaction.database = database
@@ -289,7 +289,7 @@ class CgmSourceTransactionTest {
         val gv = createGlucoseValue(timestamp = timestamp, value = 77.0, nsId = null)
         val existing = createGlucoseValue(timestamp = timestamp, value = 71.0, nsId = null)
 
-        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE)).thenReturn(existing)
+        whenever(glucoseValueDao.findByTimestampAndSensor(timestamp, GlucoseValue.SourceSensor.DEXCOM_G6)).thenReturn(existing)
 
         val transaction = CgmSourceTransaction(listOf(gv), emptyList(), null, fromNsClient = false)
         transaction.database = database
@@ -312,7 +312,7 @@ class CgmSourceTransactionTest {
         raw = value,
         noise = null,
         trendArrow = GlucoseValue.TrendArrow.FLAT,
-        sourceSensor = GlucoseValue.SourceSensor.DEXCOM_G6_NATIVE,
+        sourceSensor = GlucoseValue.SourceSensor.DEXCOM_G6,
         isValid = isValid,
         interfaceIDs_backing = InterfaceIDs(nightscoutId = nsId)
     )

@@ -5,13 +5,13 @@ import app.aaps.core.interfaces.workflow.CalculationWorkflow.Companion.MAIN_CALC
 import app.aaps.core.interfaces.workflow.CalculationWorkflow.Companion.UPDATE_PREDICTIONS
 import app.aaps.shared.tests.TestBase
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import kotlinx.coroutines.test.runTest
 
 /**
  * Pins the rule the class exists for: a slot always holds the generation the work was tagged with.

@@ -11,19 +11,20 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import app.aaps.di.testGraphs
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.configuration.ExternalOptions
 import app.aaps.core.interfaces.profile.ProfileRepository
-import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.objects.extensions.singleBlock
 import app.aaps.core.objects.extensions.singleTargetBlock
 import app.aaps.di.EmulatedOptions
+import app.aaps.di.testGraphs
 import app.aaps.e2e.AbstractDanaEmulatorUiTest.Companion.BOLUS_UNITS
+import app.aaps.e2e.AbstractDanaEmulatorUiTest.Companion.DECREMENT
+import app.aaps.e2e.AbstractDanaEmulatorUiTest.Companion.INCREMENT
 import app.aaps.pump.dana.DanaPump
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
@@ -31,6 +32,7 @@ import org.junit.After
 import org.junit.Before
 import java.io.File
 import java.util.regex.Pattern
+import app.aaps.core.interfaces.queue.CommandQueue
 
 /**
  * Pump-agnostic base for the Dana **UI** E2E tests: everything that reaches the emulated pump through

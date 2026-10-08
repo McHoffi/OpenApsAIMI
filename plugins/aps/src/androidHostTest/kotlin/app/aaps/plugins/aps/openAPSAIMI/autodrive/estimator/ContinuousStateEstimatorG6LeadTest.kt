@@ -8,7 +8,7 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Test
 
 /**
- * G6 lead (+25% velocity) must stay [SourceSensor.DEXCOM_G6_NATIVE]-only.
+ * G6 lead (+25% velocity) must stay [SourceSensor.DEXCOM_G6]-only.
  * One+ / G7 must pass velocity through unchanged.
  */
 class ContinuousStateEstimatorG6LeadTest {
@@ -38,7 +38,7 @@ class ContinuousStateEstimatorG6LeadTest {
             uamConfidence = 0.0,
             sourceSensor = SourceSensor.DEXCOM_ONEPLUS_NATIVE,
         )
-        val g6 = onePlus.copy(sourceSensor = SourceSensor.DEXCOM_G6_NATIVE)
+        val g6 = onePlus.copy(sourceSensor = SourceSensor.DEXCOM_G6)
 
         val raOnePlus = ContinuousStateEstimator(logger).apply {
             updateAndPredict(onePlus)
@@ -69,7 +69,7 @@ class ContinuousStateEstimatorG6LeadTest {
             uamConfidence = 0.0,
             sourceSensor = SourceSensor.LIBRE_3_NATIVE,
         )
-        val g6 = libre3.copy(sourceSensor = SourceSensor.DEXCOM_G6_NATIVE)
+        val g6 = libre3.copy(sourceSensor = SourceSensor.DEXCOM_G6)
 
         val raLibre3 = ContinuousStateEstimator(logger).apply {
             updateAndPredict(libre3)

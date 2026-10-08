@@ -1,6 +1,5 @@
 package app.aaps.history
 
-import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.workflow.CalculationWorkflow
 import app.aaps.core.objects.workflow.CalculationSignalsImpl
 import app.aaps.di.metro.HistoryWindowGraph
@@ -13,8 +12,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.whenever
+import app.aaps.core.interfaces.iob.IobCobCalculator
 
 /**
  * The History Browser must not share calculation objects with the running loop.

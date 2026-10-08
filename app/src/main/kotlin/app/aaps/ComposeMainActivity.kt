@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -70,6 +72,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import app.aaps.appshell.AapsAppRoot
 import app.aaps.appshell.navigation.AppRoute
 import app.aaps.appshell.navigation.appNavGraph
 import app.aaps.compose.dashboard.DashboardOverviewHost
@@ -112,6 +115,7 @@ import app.aaps.core.interfaces.sync.NsClient
 import app.aaps.core.interfaces.ui.IconsProvider
 import app.aaps.core.interfaces.ui.SnackbarHostPresence
 import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.core.interfaces.ui.UiRestart
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
@@ -213,6 +217,7 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import dev.zacsweers.metro.Inject
+import app.aaps.core.ui.R as CoreUiR
 
 
 class ComposeMainActivity : MetroAppCompatActivity() {
@@ -402,174 +407,47 @@ class ComposeMainActivity : MetroAppCompatActivity() {
 
     @Composable
     private fun MainContent() {
-        val navController = rememberNavController().also { this.navController = it }
-        val masterReachable by nsClient.masterReachable.collectAsStateWithLifecycle()
-        val masterControlAllowed by nsClient.masterControlAllowed.collectAsStateWithLifecycle()
-
-        // Global self-heal — event-driven, NOT a poll (a timer would keep the CPU awake). Probe once when
-        // we go offline, and again on each navigation while offline, so any screen/dialog the user opens
-        // re-checks. (The WS reconnect and a failed action also probe; all internally rate-limited.)
-        // `masterReachable` is lifecycle-collected and navigation only happens in the foreground, so this
-        // never runs in the background.
-        LaunchedEffect(masterReachable) {
-            if (!masterReachable) nsClient.requestMasterProbe()
-        }
-        LaunchedEffect(navController) {
-            navController.currentBackStackEntryFlow.collect {
-                if (!nsClient.masterReachable.value) nsClient.requestMasterProbe()
-            }
-        }
-
-        CompositionLocalProvider(
-            LocalPreferences provides preferences,
-            LocalDateUtil provides dateUtil,
-            LocalDecimalFormatter provides decimalFormatter,
-            // This build's own launcher icon, so the drawer and the About dialog show what the home
-            // screen shows. The client flavours each have their own owl, and IconsProvider picks it.
-            LocalAppIcon provides { modifier -> AppBrandIcon(iconResId = iconsProvider.getIcon(), modifier = modifier) },
-            // Lets the shared screens open this app's activities. Other targets do not provide it,
-            // so their screens hide those buttons instead of showing one that does nothing.
-            LocalScreenOpener provides AndroidScreenOpener(LocalContext.current),
-            LocalConfig provides config,
-            LocalMasterReachable provides masterReachable,
-            LocalMasterControlAllowed provides masterControlAllowed,
-            LocalProfileUtil provides profileUtil,
-            LocalCheckPassword provides cryptoUtil::checkPassword,
-            LocalHashPassword provides cryptoUtil::hashPassword,
-            LocalClearExportPasswordStore provides { exportPasswordDataStore.clearPasswordDataStore() },
-            LocalVisibilityContext provides visibilityContext
-        ) {
-            AapsTheme {
-                val rootSnackbarHostState = remember { SnackbarHostState() }
-                CompositionLocalProvider(LocalSnackbarHostState provides rootSnackbarHostState) {
-                    val initProgress by config.initProgressFlow.collectAsStateWithLifecycle()
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        AnimatedVisibility(
-                            visible = !initProgress.done,
-                            exit = fadeOut()
-                        ) {
-                            val splashSnackbarHostState = remember { SnackbarHostState() }
-                            LaunchedEffect(Unit) {
-                                config.initSnackbarFlow.collect { message ->
-                                    splashSnackbarHostState.showSnackbar(message)
-                                }
-                            }
-                            SplashScreen(initProgress, splashSnackbarHostState)
-                        }
-
-                        AnimatedVisibility(
-                            visible = initProgress.done,
-                            enter = fadeIn()
-                        ) {
-                            AppContent(navController)
-                        }
-
-                        // Root-level snackbar host — subscribes to EventShowSnackbar
-                        // and is the single visible SnackbarHost across every screen.
-                        GlobalSnackbarHost(
-                            rxBus = rxBus,
-                            snackbarHostPresence = snackbarHostPresence,
-                            hostState = rootSnackbarHostState,
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
-
-                        // Root-level dialog host — subscribes to EventShowDialog and
-                        // renders one modal dialog at a time.
-                        GlobalDialogHost(rxBus = rxBus)
-
-                        // The single app-level pending modal for ANY client-control round-trip
-                        // (insulin / scenes / synced-preference edits). Hosted once here, feature-
-                        // independent; round-trips are single-in-flight so at most one shows. Applied is
-                        // cleared by the dispatcher (silent); Rejected/Unconfirmed stay until dismissed.
-                        val pendingAction by clientControlActionDispatcher.pendingAction.collectAsStateWithLifecycle()
-                        pendingAction?.let { pending ->
-                            if (pending.progress !is ActionProgress.Applied)
-                                ClientControlPendingDialog(
-                                    pending = pending,
-                                    onDismiss = { clientControlActionDispatcher.dismissActionProgress() }
-                                )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun SplashScreen(progress: InitProgress, snackbarHostState: SnackbarHostState) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(MaterialTheme.colorScheme.surface),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Image(
-                    painter = painterResource(app.aaps.core.ui.R.drawable.splash_logo),
-                    contentDescription = null,
-                    modifier = Modifier.size(200.dp)
-                )
-                Spacer(Modifier.height(32.dp))
-                val error = progress.error
-                if (error != null) {
-                    Text(
-                        text = stringResource(app.aaps.core.ui.R.string.initialization_failed),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { finish() }) {
-                        Text(stringResource(app.aaps.core.ui.R.string.close))
-                    }
-                } else {
-                    Text(
-                        text = progress.step.ifEmpty { stringResource(app.aaps.core.ui.R.string.loading) },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    if (progress.total > 0) {
-                        LinearProgressIndicator(
-                            progress = { progress.current.toFloat() / progress.total },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 48.dp)
-                                .height(4.dp)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "${progress.current} / ${progress.total}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 48.dp)
-                                .height(4.dp)
-                        )
-                    }
-                }
-            }
-        }
+        // LocalActivity, not a cast of LocalContext: that context is usually a ContextWrapper, where
+        // `as? FragmentActivity` is null - and then the biometric prompt cannot be shown at all.
+        // Read here so the prompt lambdas below can capture it; the shared host no longer takes one.
+        val activity = LocalActivity.current as? FragmentActivity
+        AapsAppRoot(
+            config = config,
+            preferences = preferences,
+            dateUtil = dateUtil,
+            decimalFormatter = decimalFormatter,
+            profileUtil = profileUtil,
+            passwordHasher = cryptoUtil,
+            passwordCheck = passwordCheck,
+            protectionCheck = protectionCheck,
+            // The biometric prompt is the only platform-specific part of protection. The host used
+            // to be handed the activity; it captures it here instead, which is what let the host
+            // itself move to commonMain.
+            showBiometric = { title, onGranted, onCancelled, onDenied ->
+                if (activity != null) BiometricCheck.biometricPrompt(activity, title, rxBus, onGranted, onCancelled, onDenied, passwordCheck)
+                else onCancelled()
+            },
+            showBiometricSimple = { title, onSuccess, onFallback, onCancel ->
+                if (activity != null) BiometricCheck.biometricPromptSimple(activity, title, rxBus, onSuccess, onFallback, onCancel)
+                else onFallback()
+            },
+            exportPasswordDataStore = exportPasswordDataStore,
+            visibilityContext = visibilityContext,
+            nsClient = nsClient,
+            rxBus = rxBus,
+            snackbarHostPresence = snackbarHostPresence,
+            clientControlActionDispatcher = clientControlActionDispatcher,
+            bolusProgressData = bolusProgressData,
+            commandQueue = commandQueue,
+            pumpCommunicationStatus = pumpCommunicationStatus,
+            // The two per-build bitmaps the shared root cannot paint itself.
+            appIcon = { modifier -> Image(painterResource(iconsProvider.getIcon()), null, modifier) },
+            splashLogo = { modifier -> Image(painterResource(CoreUiR.drawable.splash_logo), null, modifier) },
+            // The Activity keeps a reference so an incoming intent can route without the composition.
+            onNavControllerReady = { navController = it },
+            onClose = { finish() },
+            content = { navController -> AppContent(navController) }
+        )
     }
 
     @SuppressLint("BatteryLife")
@@ -730,8 +608,6 @@ class ComposeMainActivity : MetroAppCompatActivity() {
 
         val state by mainViewModel.uiState.collectAsStateWithLifecycle()
         val bolusState by bolusProgressData.state.collectAsStateWithLifecycle()
-        val pumpStatusBanner by pumpCommunicationStatus.statusBannerFlow.collectAsStateWithLifecycle()
-        val pumpQueueStatus by pumpCommunicationStatus.queueStatusFlow.collectAsStateWithLifecycle()
 
         // Keep skin collector alive for the whole shell (not only when Main is composed),
         // so changes made from Preferences still update flows before returning home.
@@ -1034,31 +910,6 @@ class ComposeMainActivity : MetroAppCompatActivity() {
                     )
                 },
             )
-        }
-
-        // Modal bolus progress overlay — shown above everything for standard bolus
-        bolusState?.let { state ->
-            if (!state.isSMB) {
-                val pumpStatus = pumpStatusBanner?.text ?: ""
-                val queueStatus = pumpQueueStatus
-                PumpActivityDialog(
-                    bolusState = state,
-                    pumpStatus = pumpStatus,
-                    queueStatus = queueStatus,
-                    isModal = true,
-                    onStop = {
-                        if (config.AAPSCLIENT) {
-                            clientControlActionDispatcher.stopBolus()
-                            bolusProgressData.stopPressed()
-                        } else {
-                            commandQueue.cancelAllBoluses(null)
-                        }
-                    },
-                    // Only reachable via the stalled-state Dismiss button (client/follower): hides the
-                    // local mirror dialog. Delivery belongs to the master — this does not touch the pump.
-                    onDismiss = { bolusProgressData.clear() }
-                )
-            }
         }
     }
 

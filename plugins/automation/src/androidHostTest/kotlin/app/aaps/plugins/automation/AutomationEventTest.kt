@@ -2,8 +2,6 @@ package app.aaps.plugins.automation
 
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.pump.PumpEnactResult
-import app.aaps.plugins.automation.AutomationStringsValues
-import app.aaps.shared.tests.generatedTextResolver
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.utils.lenientBoolean
@@ -16,6 +14,7 @@ import app.aaps.plugins.automation.triggers.TriggerConnector
 import app.aaps.plugins.automation.triggers.TriggerConnectorTest
 import app.aaps.plugins.automation.triggers.TriggerUnknown
 import app.aaps.shared.tests.TestBase
+import app.aaps.shared.tests.generatedTextResolver
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
@@ -27,6 +26,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.skyscreamer.jsonassert.JSONAssert
 import kotlin.test.assertIs
+import app.aaps.plugins.automation.AutomationStringsValues
 
 class AutomationEventTest : TestBase() {
 

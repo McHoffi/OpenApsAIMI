@@ -1,6 +1,5 @@
 package app.aaps.plugins.configuration.setupwizard.elements
 
-import app.aaps.plugins.configuration.ConfigurationStrings
 import androidx.compose.runtime.Composable
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.protection.PasswordCheck
@@ -20,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
+import app.aaps.plugins.configuration.ConfigurationStrings
 
 @Inject
 open class SWItem(

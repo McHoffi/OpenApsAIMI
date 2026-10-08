@@ -30,7 +30,9 @@ import app.aaps.core.objects.extensions.toJsonObject
 import app.aaps.core.objects.extensions.toTemporaryBasal
 import app.aaps.core.utils.MidnightUtils
 import app.aaps.plugins.aps.autotune.data.ATProfile
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -39,8 +41,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.SingleIn
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.ceil
 
 @SingleIn(AppScope::class)

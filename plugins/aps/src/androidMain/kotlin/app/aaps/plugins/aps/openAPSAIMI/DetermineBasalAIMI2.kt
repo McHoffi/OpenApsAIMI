@@ -2971,7 +2971,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
         val rawCombinedDelta: Float = ((delta + predicted) / 2.0).toFloat()
 
         /* G6 BYODA (`DEXCOM_G6_NATIVE`): daytime only +30% / +20% on combinedΔ and shortAvgΔ; night and other sensors → no compensation. */
-        val isG6Byoda = ctx.glucoseStatus.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6_NATIVE
+        val isG6Byoda = ctx.glucoseStatus.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6
         val isNight = hourOfDay >= 23 || hourOfDay < 6
         val combinedDelta: Float
         val shortAvgDeltaAdj: Float
@@ -3010,7 +3010,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
 
     /** G6 BYODA flag + Autodrive prefs; [autodriveDisplay] feeds advisor / reason lines downstream. */
     private fun buildPreTherapyAutodriveByodaBootstrap(ctx: AimiTickContext): AimiPreTherapyAutodriveByodaBootstrap {
-        val isG6Byoda = ctx.glucoseStatus.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6_NATIVE
+        val isG6Byoda = ctx.glucoseStatus.sourceSensor == app.aaps.core.data.model.SourceSensor.DEXCOM_G6
         val isAutodriveV3 = preferences.get(BooleanKey.OApsAIMIautoDriveActive)
         // Classic (V1/V2) autodrive removed — "autodrive enabled" now means V3 active.
         val autodriveEnabled = isAutodriveV3
@@ -5875,11 +5875,11 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 )
             }
 
-            if (adState.sourceSensor == SourceSensor.DEXCOM_G6_NATIVE) {
+            if (adState.sourceSensor == SourceSensor.DEXCOM_G6) {
                 consoleLog.add("🤖 SENSOR_AWARE: G6 Detected -> Engaging Lead Compensator (UKF +50% Vel).")
             } else if (adState.sourceSensor == SourceSensor.DEXCOM_ONEPLUS_NATIVE) {
                 consoleLog.add("🤖 SENSOR_AWARE: One+ Detected -> Fast Sensor, Real-Time Maths Engaged (no G6 lead).")
-            } else if (adState.sourceSensor == SourceSensor.DEXCOM_G7_NATIVE) {
+            } else if (adState.sourceSensor == SourceSensor.DEXCOM_G7) {
                 consoleLog.add("🤖 SENSOR_AWARE: G7 Detected -> Fast Sensor, Real-Time Maths Engaged.")
             } else if (adState.sourceSensor == SourceSensor.LIBRE_3_NATIVE) {
                 consoleLog.add("🤖 SENSOR_AWARE: Libre 3 native Detected -> Fast Sensor, Real-Time Maths Engaged (no G6 lead).")

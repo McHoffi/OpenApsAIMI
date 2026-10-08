@@ -16,6 +16,7 @@ import app.aaps.core.data.model.TT
 import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.interfaces.overview.graph.TbrState
 import app.aaps.core.ui.compose.navigation.NavigationRequest
+import app.aaps.core.ui.compose.stringResource
 import app.aaps.ui.compose.main.TempTargetChipState
 import app.aaps.ui.compose.overview.chips.RunningModeChip
 import app.aaps.ui.compose.overview.chips.SensitivityUiState

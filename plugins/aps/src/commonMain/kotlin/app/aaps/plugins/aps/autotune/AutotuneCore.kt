@@ -13,6 +13,7 @@ import kotlin.time.Instant
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import java.util.Calendar
 import kotlin.math.max
 
 @SingleIn(AppScope::class)

@@ -1,6 +1,5 @@
 package app.aaps.di
 
-import app.aaps.di.GeneratedStringOwners
 import android.app.Application
 import android.content.Context
 import androidx.work.Configuration
@@ -11,12 +10,13 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.aaps.core.interfaces.di.MetroMemberInjector
 import app.aaps.core.ui.compose.MetroViewModelFactoryOwner
-import app.aaps.di.metro.MetroGraphs
 import app.aaps.database.di.DatabaseConfig
+import app.aaps.di.metro.MetroGraphs
 import com.google.firebase.Firebase
 import com.google.firebase.analytics.analytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
+import app.aaps.di.GeneratedStringOwners
 
 /**
  * Base application for instrumented tests. Mirrors [app.aaps.MainApp]: both build the one Metro root

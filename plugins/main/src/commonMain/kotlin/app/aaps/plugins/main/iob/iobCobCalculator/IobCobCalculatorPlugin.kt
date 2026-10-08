@@ -57,7 +57,6 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.extensions.combine
 import app.aaps.core.objects.extensions.convertedToAbsolute
-import app.aaps.core.objects.extensions.iobCalc
 import app.aaps.core.objects.extensions.plus
 import app.aaps.core.objects.extensions.round
 import app.aaps.plugins.aps.openAPSAIMI.orchestration.AimiLoopRuntimeGuard
@@ -65,9 +64,9 @@ import app.aaps.plugins.main.MainStrings
 import app.aaps.plugins.main.iob.iobCobCalculator.data.AutosensDataStoreObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
@@ -79,6 +78,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import app.aaps.core.objects.extensions.iobCalc
 
 class IobCobCalculatorPlugin(
     aapsLogger: AAPSLogger,
@@ -120,7 +120,8 @@ class IobCobCalculatorPlugin(
     // should. kotlin.concurrent.Volatile, which works in common code.
     @Volatile override var ads: AutosensDataStore = AutosensDataStoreObject()
 
-    private val dataLock = AapsLock()
+    // Guards iobTable, every read and every write. Internal only so a test can hold it.
+    internal val dataLock = AapsLock()
 
     @OptIn(FlowPreview::class)
     override suspend fun onStart() {
@@ -323,7 +324,10 @@ class IobCobCalculatorPlugin(
     override suspend fun calculateFromTreatmentsAndTemps(toTime: Long, profile: EffectiveProfile): IobTotal {
         val now = dateUtil.now()
         val time = ads.roundUpTime(toTime)
-        val cacheHit = iobTable[time]
+        // Under the same lock as every write. iobTable is a plain LongSparseArray, and the writers
+        // (new BG, history change, clearCache) run on other threads: a read without the lock could
+        // see the arrays half compacted and return the IOB of another time, or throw (#5211).
+        val cacheHit = dataLock.withLock { iobTable[time] }
         if (time < now && cacheHit != null) {
             //og.debug(">>> calculateFromTreatmentsAndTemps Cache hit " + new Date(time).toLocaleString());
             return cacheHit
