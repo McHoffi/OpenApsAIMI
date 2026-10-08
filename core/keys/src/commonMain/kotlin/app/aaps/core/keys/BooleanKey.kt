@@ -456,6 +456,17 @@ enum class BooleanKey(
         "key_aimi_tube_veto_ignore_floor_artefact", false,
         title = KeysStrings.pref_title_aimi_tube_veto_ignore_floor_artefact,
         summary = KeysStrings.pref_summary_aimi_tube_veto_ignore_floor_artefact),
+    /**
+     * Tube: replace the hyper-reversion clamp (min-pred exactly 80 at BG >= 160) by `BG - IOB * ISF`.
+     * The clamp ignores insulin on board: too strict on a low-IOB meal rise, too permissive with a big
+     * stack. ON by default; the bound and what it changed are exported in `tube_advisor.hyper_clamp_*`
+     * for review. See `HyperClampTubeBound`.
+     */
+    OApsAIMITubeHyperClampPhysicalBound(
+        "key_aimi_tube_hyper_clamp_physical_bound", true,
+        title = KeysStrings.pref_title_aimi_tube_hyper_clamp_physical_bound,
+        summary = KeysStrings.pref_summary_aimi_tube_hyper_clamp_physical_bound),
+
 
     OApsAIMIPkpdPredictionKinetics(
         "key_aimi_pkpd_prediction_kinetics", true,
@@ -591,6 +602,10 @@ enum class BooleanKey(
         title = KeysStrings.pref_title_aimi_peak_governor_enabled,
         summary = KeysStrings.pref_summary_aimi_peak_governor_enabled),
     OApsAIMIPkpdSetupWizardCompleted( "key_aimi_pkpd_setup_wizard_completed", false, title = TextRef.Literal("")),
+    OApsAIMIPkpdCurveLearningGate(
+        "key_aimi_pkpd_curve_learning_gate", false,
+        title = TextRef.Literal(""),
+        summary = TextRef.Literal("")),
     OApsAIMIPkpdEnabled( "key_aimi_pkpd_enabled", false, title = TextRef.Literal("")),
     OApsAIMINightGrowthEnabled( "key_oaps_aimi_ngr_enabled", true, title = TextRef.Literal("")),
     OApsAIMIWCycleRequireConfirm( "key_use_Aimi_wcycle_require_confirm", false, title = TextRef.Literal("")),

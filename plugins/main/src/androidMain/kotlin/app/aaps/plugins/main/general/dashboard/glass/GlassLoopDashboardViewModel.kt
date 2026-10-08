@@ -95,7 +95,8 @@ class GlassLoopDashboardViewModel(
 
                 val iob = result?.iob
                 val iobText = if (iob != null)
-                    resourceHelper.gs(InterfacesStrings.format_insulin_units, iob.iob + iob.basaliob)
+                    // `result.iob` comes from IobTotal.combine(): `iob` already holds the basal part.
+                    resourceHelper.gs(InterfacesStrings.format_insulin_units, iob.iob)
                 else
                     "--"
 
