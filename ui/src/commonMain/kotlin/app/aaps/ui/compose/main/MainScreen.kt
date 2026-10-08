@@ -231,8 +231,11 @@ fun MainScreen(
             var topBarHeightPx by remember { mutableIntStateOf(0) }
             var bottomBarHeightPx by remember { mutableIntStateOf(0) }
 
-            // Pin while the user must see the top bar to get out of search or the drawer.
-            val chromePinned = searchUiState.isSearchActive || !drawerState.isClosed
+            // Pin while the user must see the top bar to get out of search, the drawer or Glass.
+            // Glass content lives in its own ComposeView inside an AndroidView, so its scroll
+            // never reaches chromeAutoHideScroll and its clickables eat the reveal tap. Without
+            // this pin the bars hide after 3 s and the user cannot reach the skin setting.
+            val chromePinned = searchUiState.isSearchActive || !drawerState.isClosed || isGlassSkin
             LaunchedEffect(chromePinned) {
                 chrome.pin(chromePinned)
             }

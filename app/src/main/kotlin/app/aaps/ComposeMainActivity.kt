@@ -411,7 +411,14 @@ class ComposeMainActivity : MetroAppCompatActivity() {
         // `as? FragmentActivity` is null - and then the biometric prompt cannot be shown at all.
         // Read here so the prompt lambdas below can capture it; the shared host no longer takes one.
         val activity = LocalActivity.current as? FragmentActivity
-        AapsAppRoot(
+        CompositionLocalProvider(
+            // Lets the shared screens open this app's activities (Advisor / Meal / Context tiles).
+            // Other targets do not provide it, so those screens hide the buttons instead of
+            // showing one that does nothing. AapsAppRoot cannot provide this: only the Android
+            // shell knows how to start an activity by class name.
+            LocalScreenOpener provides AndroidScreenOpener(LocalContext.current),
+        ) {
+            AapsAppRoot(
             config = config,
             preferences = preferences,
             dateUtil = dateUtil,
@@ -447,7 +454,8 @@ class ComposeMainActivity : MetroAppCompatActivity() {
             onNavControllerReady = { navController = it },
             onClose = { finish() },
             content = { navController -> AppContent(navController) }
-        )
+            )
+        }
     }
 
     @SuppressLint("BatteryLife")
