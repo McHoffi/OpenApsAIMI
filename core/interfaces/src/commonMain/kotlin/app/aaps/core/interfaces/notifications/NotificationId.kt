@@ -280,7 +280,13 @@ enum class NotificationId(
 
     // One command has been running in the queue for too long, so nothing else reaches the pump (#5209).
     // Appended at the END for the same reason as above.
-    PUMP_DRIVER_NOT_RESPONDING(URGENT, PUMP);
+    PUMP_DRIVER_NOT_RESPONDING(URGENT, PUMP),
+
+    /**
+     * A pre-soak sensor (ONE+ / G7 or Libre 3) was switched to production by itself, without the
+     * user pressing the promote button. Appended last on purpose, see the comment above.
+     */
+    CGM_STAGING_AUTO_PROMOTED(NORMAL, CGM);
 
     companion object {
 
