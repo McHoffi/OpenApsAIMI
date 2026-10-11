@@ -8,6 +8,7 @@ class ConcentrationTypeTest {
     @Test
     fun `fromDouble returns correct type for known values`() {
         assertEquals(ConcentrationType.U10, ConcentrationType.fromDouble(0.1))
+        assertEquals(ConcentrationType.U20, ConcentrationType.fromDouble(0.2))
         assertEquals(ConcentrationType.U40, ConcentrationType.fromDouble(0.4))
         assertEquals(ConcentrationType.U50, ConcentrationType.fromDouble(0.5))
         assertEquals(ConcentrationType.U100, ConcentrationType.fromDouble(1.0))
@@ -26,6 +27,7 @@ class ConcentrationTypeTest {
     @Test
     fun `fromInt returns correct type for known values`() {
         assertEquals(ConcentrationType.U10, ConcentrationType.fromInt(10))
+        assertEquals(ConcentrationType.U20, ConcentrationType.fromInt(20))
         assertEquals(ConcentrationType.U40, ConcentrationType.fromInt(40))
         assertEquals(ConcentrationType.U50, ConcentrationType.fromInt(50))
         assertEquals(ConcentrationType.U100, ConcentrationType.fromInt(100))
@@ -44,6 +46,7 @@ class ConcentrationTypeTest {
     @Test
     fun `value property matches expected concentration multiplier`() {
         assertEquals(0.1, ConcentrationType.U10.value)
+        assertEquals(0.2, ConcentrationType.U20.value)
         assertEquals(0.4, ConcentrationType.U40.value)
         assertEquals(0.5, ConcentrationType.U50.value)
         assertEquals(1.0, ConcentrationType.U100.value)

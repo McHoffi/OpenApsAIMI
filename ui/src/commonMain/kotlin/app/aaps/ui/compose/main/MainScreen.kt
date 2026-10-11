@@ -36,7 +36,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,6 +57,7 @@ import app.aaps.core.ui.compose.dialogs.ThreeButtonDialog
 import app.aaps.core.ui.compose.navigation.NavigationRequest
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.core.ui.compose.stringResource
+import app.aaps.ui.UiStrings
 import app.aaps.ui.compose.aboutDialog.AboutAlertDialog
 import app.aaps.ui.compose.aboutDialog.AboutDialogData
 import app.aaps.ui.compose.loopSheet.LoopActionViewModel
@@ -224,6 +228,7 @@ fun MainScreen(
                 initiallyVisible = maxHeight >= START_HIDDEN_MAX_HEIGHT
             )
             val showChrome = chrome.isVisible
+            val accessibilityManager = LocalAccessibilityManager.current
 
             // Latch measured bar heights. Never write 0 back — a transient 0 during
             // AnimatedVisibility exit can schedule a remeasure on a node that is losing its
@@ -241,10 +246,11 @@ fun MainScreen(
             }
 
             // Idle hide — only while shown and not pinned. Restarts whenever the bars are shown
-            // again or a pull at the top extends the peek.
+            // again or a pull at the top extends the peek. Honours the system "Time to take
+            // action" setting: a screen reader user moving through the bars needs longer than 3 s.
             LaunchedEffect(chrome.isVisible, chrome.showToken, chrome.isPinned) {
                 if (!chrome.isVisible || chrome.isPinned) return@LaunchedEffect
-                delay(AUTO_HIDE_DELAY_MS)
+                delay(accessibilityManager?.calculateRecommendedTimeoutMillis(AUTO_HIDE_DELAY_MS, containsIcons = true, containsControls = true) ?: AUTO_HIDE_DELAY_MS)
                 chrome.onIdleTimeout()
             }
 

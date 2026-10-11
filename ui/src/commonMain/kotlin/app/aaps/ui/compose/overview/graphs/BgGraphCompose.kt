@@ -159,6 +159,8 @@ fun BgGraphCompose(
     zoomState: VicoZoomState,
     derivedTimeRange: Pair<Long, Long>?,
     nowTimestamp: Long,
+    /** Only this window counts for the Y range and the chart extras. Null = the whole range. */
+    visibleTimeRange: Pair<Long, Long>? = null,
     useMaterial3DashboardStyle: Boolean = false,
     /** Dashboard-only SMB markers as a Vico line series (triangles), empty on overview. */
     dashboardSmbMarkers: List<ChartSmbMarker> = emptyList(),
@@ -497,6 +499,10 @@ fun BgGraphCompose(
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                 }
             }
+
+            // Force a visible-range change to count as a new transaction even when the series data
+            // is identical (scroll/zoom resubmits the same partials) — see BG_VISIBLE_RANGE_KEY.
+            extras { it[BG_VISIBLE_RANGE_KEY] = visibleTimeRange?.first to visibleTimeRange?.second }
         }
     }
 
@@ -537,16 +543,21 @@ fun BgGraphCompose(
         dashboardSmbMarkers,
         dashboardSplitActivityToStrip,
         dashboardScenarioProjectionVisuals,
+        visibleTimeRange,
     ) {
         seriesRegistry[SERIES_REGULAR] = bgReadings
         seriesRegistry[SERIES_BUCKETED] = bucketedData
         for ((key, points) in predictionsByType) {
             seriesRegistry[key] = points
         }
-        // maxBgY clamped against highMark (same as legacy GraphData.maxY logic)
+        // maxBgY/minBgY clamped against highMark/lowMark. Only the visible window counts when one
+        // is given, so a zoomed-in high reading does not flatten the rest of the chart (#5245).
+        fun inWindow(timestamp: Long) = visibleTimeRange == null || timestamp in visibleTimeRange.first..visibleTimeRange.second
         val allBgValues = (bgReadings + bucketedData).map { it.value }
-        var maxBgY = if (allBgValues.isNotEmpty()) maxOf(allBgValues.max(), chartConfig.highMark) else chartConfig.highMark
-        val minBgY = if (allBgValues.isNotEmpty()) minOf(allBgValues.min(), chartConfig.lowMark) else chartConfig.lowMark
+        val windowedBgValues = (bgReadings + bucketedData).filter { inWindow(it.timestamp) }.map { it.value }
+        val valuesForScale = windowedBgValues.ifEmpty { allBgValues }
+        var maxBgY = if (valuesForScale.isNotEmpty()) maxOf(valuesForScale.max(), chartConfig.highMark) else chartConfig.highMark
+        val minBgY = if (valuesForScale.isNotEmpty()) minOf(valuesForScale.min(), chartConfig.lowMark) else chartConfig.lowMark
         rebuildChart(basalData, targetData, epsPoints, activityData, minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
         val sortedBgAsc = bgReadings.sortedBy { it.timestamp }
         val fallbackSmbY = viewModel.glucoseDisplayYToMgdl(

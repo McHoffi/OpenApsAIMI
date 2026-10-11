@@ -69,6 +69,7 @@ fun MaintenanceBottomSheet(
     onToggleCsvCloud: (Boolean) -> Unit = {},
     onToggleAimiCloud: (Boolean) -> Unit = {},
     isDirectoryAccessGranted: Boolean = false,
+    directoryPath: String? = null,
     showDevTools: Boolean = false,
     onTestInternalAlarm: () -> Unit = {},
     onTestInternalUrgentAlarm: () -> Unit = {},
@@ -106,6 +107,7 @@ fun MaintenanceBottomSheet(
             onToggleCsvCloud = onToggleCsvCloud,
             onToggleAimiCloud = onToggleAimiCloud,
             isDirectoryAccessGranted = isDirectoryAccessGranted,
+            directoryPath = directoryPath,
             showDevTools = showDevTools,
             onTestInternalAlarm = onTestInternalAlarm,
             onTestInternalUrgentAlarm = onTestInternalUrgentAlarm,
@@ -143,6 +145,7 @@ internal fun MaintenanceBottomSheetContent(
     onToggleCsvCloud: (Boolean) -> Unit = {},
     onToggleAimiCloud: (Boolean) -> Unit = {},
     isDirectoryAccessGranted: Boolean = false,
+    directoryPath: String? = null,
     showDevTools: Boolean = false,
     onTestInternalAlarm: () -> Unit = {},
     onTestInternalUrgentAlarm: () -> Unit = {},
@@ -151,7 +154,6 @@ internal fun MaintenanceBottomSheetContent(
     onStopTestAlarms: () -> Unit = {}
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
-    MaterialTheme.colorScheme.error
     val isCloudActive = exportConfig?.isCloudActive == true
     val hasCloudError = exportConfig?.isCloudError == true
     val hasCloudCredentials = exportConfig?.hasCloudCredentials == true
@@ -210,7 +212,8 @@ internal fun MaintenanceBottomSheetContent(
 
         MaintenanceItem(
             text = stringResource(CoreUiStrings.aaps_directory),
-            description = stringResource(CoreUiStrings.maintenance_aaps_directory_desc),
+            // The chosen folder once there is one: "Select local storage folder" did not say where the files go.
+            description = directoryPath ?: stringResource(CoreUiStrings.maintenance_aaps_directory_desc),
             icon = Icons.Default.Folder,
             color = primaryColor,
             onDismiss = onDismiss,

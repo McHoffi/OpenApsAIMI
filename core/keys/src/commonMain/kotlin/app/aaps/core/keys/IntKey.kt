@@ -137,6 +137,7 @@ enum class IntKey(
         max = 1000,
         title = KeysStrings.pref_title_bage_warning,
         defaultedBySM = true,
+        visibility = ElementVisibility.BATTERY_REPLACEABLE,
         unitType = UnitType.HOURS,
         sync = SyncSpec(SyncChannel.Cold, SyncDirection.Bidirectional)
     ),
@@ -147,6 +148,7 @@ enum class IntKey(
         max = 1000,
         title = KeysStrings.pref_title_bage_critical,
         defaultedBySM = true,
+        visibility = ElementVisibility.BATTERY_REPLACEABLE,
         unitType = UnitType.HOURS,
         sync = SyncSpec(SyncChannel.Cold, SyncDirection.Bidirectional)
     ),

@@ -220,6 +220,9 @@
     <string name="a11y_arrow_unknown">unknown</string>
     <string name="a11y_min_button_description" comment="Screen-reader label for the minus button of a number field. %1$s = the field label, %2$s = the step it changes by. Example: decrement Carbs by 5">decrement %1$s by %2$s</string>
     <string name="a11y_plus_button_description" comment="Screen-reader label for the plus button of a number field. %1$s = the field label, %2$s = the step it changes by. Example: increment Carbs by 5">increment %1$s by %2$s</string>
+    <string name="a11y_move_up" comment="Screen-reader action to move an item one place up in a list that is otherwise reordered by dragging.">Move up</string>
+    <string name="a11y_move_down" comment="Screen-reader action to move an item one place down in a list that is otherwise reordered by dragging.">Move down</string>
+    <string name="a11y_wizard_step" comment="Screen-reader text for the step dots of a pump pairing or activation wizard, said again on every new step. %1$d=current step, %2$d=number of steps. Example: Step 3 of 7">Step %1$d of %2$d</string>
     <string name="decrement">decrement</string>
     <string name="increment">increment</string>
     <string name="a11y_high">high</string>
@@ -252,6 +255,7 @@
     <string name="login">Login</string>
     <string name="logout">Logout</string>
     <string name="prime_fill">Prime/Fill</string>
+    <string name="prime_not_available">This pump fills and primes itself during activation. Prime/Fill from AAPS is not available.</string>
     <string name="site_rotation">Site Rotation</string>
     <string name="edit_site">Edit</string>
     <string name="select_arrow">Select Arrow</string>
@@ -440,6 +444,7 @@
     <string name="scene_editor_disabled">Disabled</string>
     <string name="scene_summary">%1$d actions, %2$s</string>
     <string name="scene_summary_with_chain" comment="%1$s=scene summary, %2$s=name of the scene that starts when this one ends. Example: 3 actions, 2 hours → Cooldown">%1$s → %2$s</string>
+    <string name="quicklaunch_tt_description" comment="Temp target preset on a QuickLaunch button. %1$s=target with unit, %2$s=duration. Example: 5.0 mmol/L, 45 min">%1$s, %2$s</string>
     <string name="scene_duration_indefinite">Indefinite (manual end)</string>
     <string name="scene_some_actions_failed">Some actions failed</string>
     <string name="scene_no_active">No active scene</string>
@@ -873,7 +878,6 @@
     <string name="patient_type">Patient type</string>
 
     <!--    Protection-->
-    <string name="unlock_settings">Unlock settings</string>
 
     <!--    Pumps -->
     <string name="battery_label">Battery</string>

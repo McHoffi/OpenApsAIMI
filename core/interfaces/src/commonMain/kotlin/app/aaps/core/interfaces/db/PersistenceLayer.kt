@@ -108,7 +108,7 @@ interface PersistenceLayer {
      * Emits Unit once whenever all tables are wiped (clearDatabases).
      * Observers that cache DB-derived state (e.g. status lights) should subscribe and refresh.
      */
-    fun databaseClearedFlow(): Flow<Unit>
+    val databaseClearedFlow: Flow<Unit>
 
 
     // BS

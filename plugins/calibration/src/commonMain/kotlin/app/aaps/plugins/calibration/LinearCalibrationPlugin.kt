@@ -130,7 +130,7 @@ class LinearCalibrationPlugin(
         // App-wide "Reset databases" wipes the table via Room clearAllTables, which bypasses the
         // change-tracking flow above — observe the dedicated cleared signal so the graph recomputes.
         scope?.launch {
-            persistenceLayer.databaseClearedFlow().collect {
+            persistenceLayer.databaseClearedFlow.collect {
                 rxBus.send(EventCalibrationChanged())
             }
         }

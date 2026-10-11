@@ -23,7 +23,8 @@ internal fun MaintenanceBottomSheetContentPreview() {
                 aimiCloud = false,
                 cloudDisplayName = "Google Drive"
             ),
-            isDirectoryAccessGranted = true
+            isDirectoryAccessGranted = true,
+            directoryPath = "Documents/AAPS"
         )
     }
 }

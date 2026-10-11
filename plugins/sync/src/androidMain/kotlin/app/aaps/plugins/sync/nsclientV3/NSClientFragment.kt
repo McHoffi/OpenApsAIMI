@@ -27,7 +27,7 @@ import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.logging.UserEntryLogger
-import app.aaps.core.interfaces.nsclient.NSClientLog
+import app.aaps.core.interfaces.sync.SyncLogEntry
 import app.aaps.core.interfaces.nsclient.NSClientRepository
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBase
@@ -49,11 +49,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.zacsweers.metro.Inject
 
-private fun NSClientLog.toPreparedHtml(dateUtil: DateUtil): StringBuilder {
+private fun SyncLogEntry.toPreparedHtml(dateUtil: DateUtil): StringBuilder {
     val sb = StringBuilder()
     sb.append(dateUtil.timeStringWithSeconds(date))
     sb.append(" <b>").append(action).append("</b> ")
-    sb.append(logText ?: "")
+    sb.append(text ?: "")
     if (json != null) sb.append(" {...}")
     sb.append("<br>")
     return sb
@@ -244,7 +244,7 @@ class NSClientFragment : Fragment(), MenuProvider, PluginFragment {
         handler.removeCallbacksAndMessages(null)
     }
 
-    private inner class RecyclerViewAdapter(private var logList: List<NSClientLog>) : RecyclerView.Adapter<RecyclerViewAdapter.NsClientLogViewHolder>() {
+    private inner class RecyclerViewAdapter(private var logList: List<SyncLogEntry>) : RecyclerView.Adapter<RecyclerViewAdapter.NsClientLogViewHolder>() {
 
         override fun onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): NsClientLogViewHolder =
             NsClientLogViewHolder(LayoutInflater.from(viewGroup.context).inflate(R.layout.ns_client_log_item, viewGroup, false))
