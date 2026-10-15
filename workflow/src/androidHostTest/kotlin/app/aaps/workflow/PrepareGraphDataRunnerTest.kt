@@ -18,7 +18,9 @@ import app.aaps.core.interfaces.glucose.GlucoseCorrection
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.overview.OverviewData
+import app.aaps.core.interfaces.overview.graph.ActivityGraphData
 import app.aaps.core.interfaces.overview.graph.OverviewDataCache
+import app.aaps.core.interfaces.overview.graph.TimeRange
 import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventBucketedDataCreated
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -88,7 +91,6 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
 
     @BeforeEach
     fun setup() {
-        whenever(workerParameters.inputData).thenReturn(workDataOf())
         whenever(dataIobCob.ads).thenReturn(dataAds)
         whenever(dataAds.clone()).thenReturn(dataAds)
         whenever(dataAds.dataLock).thenReturn(AapsLock())
@@ -106,7 +108,7 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
         whenever(profileFunction.getProfile(any())).thenReturn(null)
         whenever(dataAds.getLastAutosensData(any(), any(), any())).thenReturn(null)
         whenever(persistenceLayer.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
-        whenever(persistenceLayer.getApsResults(any(), any())).thenReturn(emptyList())
+        whenever(persistenceLayer.getVariableSensitivities(any(), any())).thenReturn(emptyList())
         whenever(persistenceLayer.getTemporaryTargetActiveAt(any())).thenReturn(null)
         whenever(dataIobCob.calculateIobArrayForSMB(any(), any(), any(), any())).thenReturn(emptyArray())
         whenever(dataIobCob.iobArrayToString(any())).thenReturn("")
@@ -156,7 +158,7 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
 
     @Test
     fun `missing or stale chain data returns failure`() = runTest {
-        whenever(workflowChainData.prepareFor(anyOrNull(), any())).thenReturn(null)
+        whenever(workflowChainData.prepareFor(any(), any())).thenReturn(null)
 
         assertIs<WorkOutcome.Failure>(run())
     }
@@ -164,7 +166,7 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
     @Test
     fun `full run traverses all phases and emits progress`() = runTest {
         stubSuspendCalls()
-        whenever(workflowChainData.prepareFor(anyOrNull(), any())).thenReturn(buildData(bgDataReload = false, emitFinalProgress = true))
+        whenever(workflowChainData.prepareFor(any(), any())).thenReturn(buildData(bgDataReload = false, emitFinalProgress = true))
 
         val result = run()
 
@@ -174,10 +176,43 @@ class PrepareGraphDataRunnerTest : TestBaseWithProfile() {
         verify(signals).emitProgress(eq(ProgressData.DRAW_FINAL), any())
     }
 
+    /**
+     * The prepare pass runs before the one that knows the horizon, so it has to leave the horizon
+     * alone. When it wrote `endTime = toTime` instead, the future activity stopped at the next full
+     * hour while the axis went on to the newest prediction.
+     *
+     * `updateTimeRange` writes through to the flow on purpose: the pass reads the range back when it
+     * builds the IOB and activity series, so a collapsed end has to be able to reach that read, or
+     * this test would pass with the bug in place.
+     */
+    @Test
+    fun `the prepare pass keeps the horizon and the future activity reaches it`() = runTest {
+        stubSuspendCalls()
+        val toTime = now + T.mins(30).msecs()
+        val horizon = toTime + T.hours(4).msecs()
+        whenever(overviewData.toTime).thenReturn(toTime)
+        // As the post phase of the previous run left it.
+        val timeRange = MutableStateFlow<TimeRange?>(TimeRange(fromTime = toTime - T.hours(24).msecs(), toTime = toTime, endTime = horizon))
+        whenever(cache.timeRangeFlow).thenReturn(timeRange)
+        whenever(cache.updateTimeRange(any())).then { timeRange.value = it.arguments[0] as TimeRange? }
+        whenever(profileFunction.getProfile(any<Long>())).thenReturn(effectiveProfile)
+        whenever(dataIobCob.calculateFromTreatmentsAndTemps(any(), any())).thenAnswer { IobTotal(it.arguments[0] as Long, activity = 0.01) }
+        whenever(dataIobCob.calculateAbsoluteIobFromBaseBasals(any())).thenAnswer { IobTotal(it.arguments[0] as Long) }
+        whenever(workflowChainData.prepareFor(anyOrNull(), any())).thenReturn(buildData(bgDataReload = false, emitFinalProgress = false))
+
+        run()
+
+        assertThat(timeRange.value?.endTime).isEqualTo(horizon)
+        val activity = argumentCaptor<ActivityGraphData>()
+        verify(cache).updateActivityGraph(activity.capture())
+        assertThat(activity.lastValue.activityPrediction.last().timestamp).isGreaterThan(toTime)
+        assertThat(activity.lastValue.activityPrediction.last().timestamp).isAtMost(horizon)
+    }
+
     @Test
     fun `bg data reload phase loads, smooths and signals bucketed data`() = runTest {
         stubSuspendCalls()
-        whenever(workflowChainData.prepareFor(anyOrNull(), any())).thenReturn(buildData(bgDataReload = true, emitFinalProgress = false))
+        whenever(workflowChainData.prepareFor(any(), any())).thenReturn(buildData(bgDataReload = true, emitFinalProgress = false))
 
         val result = run()
 

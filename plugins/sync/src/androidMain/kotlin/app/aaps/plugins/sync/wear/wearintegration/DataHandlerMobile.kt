@@ -57,6 +57,7 @@ import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.interfaces.pump.PumpInsulin
 import app.aaps.core.interfaces.pump.PumpStatusProvider
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.receivers.ReceiverStatusStore
@@ -96,7 +97,6 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.objects.extensions.apsAdjustedTargetMgdl
 import app.aaps.core.objects.extensions.convertedToAbsolute
 import app.aaps.core.objects.extensions.round
@@ -137,6 +137,13 @@ private const val HEALTH_EVENT_QUIET_PERIOD_MS = 500L
 // The phone path keeps its own copy in AfrezzaDialogViewModel.AFREZZA_UNITS_PER_IU
 // (:plugins:sync does not depend on :ui). Keep BOTH copies in sync.
 private const val AFREZZA_UNITS_PER_IU = 2.0
+
+/**
+ * How much BG history the watch gets in `GraphData`. The largest window any watch surface draws: the
+ * BG graph complication, tile and activity offer 1, 3 or 6 h, the code-based faces 1 to 5 h. Raise it
+ * together with those settings, never on its own.
+ */
+private const val WEAR_GRAPH_HOURS = 6L
 
 @SingleIn(AppScope::class)
 @Inject
@@ -346,7 +353,7 @@ class DataHandlerMobile(
             if (rejectIfNotReady()) return@onControlEvent
             // Defense-in-depth: Fill is off-relay and delivered locally only — a client must never reach here.
             if (rejectIfAapsClient()) return@onControlEvent
-            if (constraintChecker.applyBolusConstraints(ConstraintObject(it.insulin, aapsLogger)).value() - it.insulin != 0.0) {
+            if (constraintChecker.applyPrimingConstraints(PumpInsulin(it.insulin)).cU - it.insulin != 0.0) {
                 rxBus.send(EventShowSnackbar("aborting: previously applied constraint changed", EventShowSnackbar.Type.Warning))
                 sendError("aborting: previously applied constraint changed")
             } else
@@ -470,8 +477,7 @@ class DataHandlerMobile(
         // Map loop mode
         val runningModeRecord = loop.runningModeRecord()
         val loopMode = runningModeRecord.mode.toLoopMode()
-        // End time of a temporary mode (suspend/disconnect/superbolus) so the watch can show remaining duration
-        val modeEndTime = if (runningModeRecord.isTemporary()) runningModeRecord.timestamp + runningModeRecord.duration else null
+        val modeEndTime = runningModeRecord.endTimeForWatch()
 
         // Build temp target info
         val tempTargetInfo = tempTarget?.let {
@@ -1080,7 +1086,8 @@ class DataHandlerMobile(
             3    -> preferences.get(DoubleKey.ActionsFillButton3)
             else -> return
         }
-        val insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(amount, aapsLogger)).value()
+        // A prime is in pump units.
+        val insulinAfterConstraints = constraintChecker.applyPrimingConstraints(PumpInsulin(amount)).cU
         var message = rh.gs(CoreUiStrings.prime_fill) + ": " + insulinAfterConstraints + rh.gs(SyncStrings.units_short)
         if (insulinAfterConstraints - amount != 0.0) message += "\n" + rh.gs(CoreUiStrings.constraint_applied)
         sendToWear(
@@ -1098,7 +1105,8 @@ class DataHandlerMobile(
             sendError(it)
             return
         }
-        val insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(command.insulin, aapsLogger)).value()
+        // A prime is in pump units.
+        val insulinAfterConstraints = constraintChecker.applyPrimingConstraints(PumpInsulin(command.insulin)).cU
         var message = rh.gs(CoreUiStrings.prime_fill) + ": " + insulinAfterConstraints + rh.gs(SyncStrings.units_short)
         if (insulinAfterConstraints - command.insulin != 0.0) message += "\n" + rh.gs(CoreUiStrings.constraint_applied)
         sendToWear(
@@ -1344,15 +1352,7 @@ class DataHandlerMobile(
         // so a resend must not disagree with the flow about whether the STOP button belongs there.
         sendActiveSceneState(scenes.hasSceneToStop())
         // GraphData
-        iobCobCalculator.ads.getBucketedDataTableCopy()?.let { bucketedData ->
-            // Hoist out of the per-bucket map: getGlucoseStatusData copies the bucketed table and runs a polynomial fit on every call.
-            val glucoseStatus = glucoseStatusProvider.getGlucoseStatusData(true)
-            val units = profileFunction.getUnits()
-            val lowLine = profileUtil.convertToMgdl(preferences.get(UnitDoubleKey.OverviewLowMark), units)
-            val highLine = profileUtil.convertToMgdl(preferences.get(UnitDoubleKey.OverviewHighMark), units)
-            val slopeArrow = (trendCalculator.getTrendArrow(iobCobCalculator.ads) ?: TrendArrow.NONE).symbol
-            sendToWear(EventData.GraphData(ArrayList(bucketedData.map { buildSingleBg(it, glucoseStatus, units, lowLine, highLine, slopeArrow) })))
-        }
+        buildGraphData()?.let { sendToWear(it) }
         // Treatments
         sendTreatments()
         // Status
@@ -1361,11 +1361,34 @@ class DataHandlerMobile(
         handleAvailableRunningModes()
     }
 
-    private fun AutomationEvent.toWear(now: Long): EventData.UserAction.UserActionEntry =
-        EventData.UserAction.UserActionEntry(timeStamp = now, id = id, title = title)
+    /**
+     * The BG history for the watch graph, or null before the bucketed table exists.
+     *
+     * The table holds 24 h plus the longest DIA, about 400 buckets; the watch draws at most
+     * [WEAR_GRAPH_HOURS] of it. Sending all of it cost the watch a ~100 KB message, its parse, four
+     * DataStore writes and a log line - every BG, all day.
+     */
+    // internal, not private, so the test can drive it without the rest of resendData.
+    internal suspend fun buildGraphData(): EventData.GraphData? =
+        iobCobCalculator.ads.getBucketedDataTableCopy()?.let { bucketedData ->
+            // Hoist out of the per-bucket map: getGlucoseStatusData copies the bucketed table and runs a polynomial fit on every call.
+            val glucoseStatus = glucoseStatusProvider.getGlucoseStatusData(true)
+            val units = profileFunction.getUnits()
+            val lowLine = profileUtil.convertToMgdl(preferences.get(UnitDoubleKey.OverviewLowMark), units)
+            val highLine = profileUtil.convertToMgdl(preferences.get(UnitDoubleKey.OverviewHighMark), units)
+            val slopeArrow = (trendCalculator.getTrendArrow(iobCobCalculator.ads) ?: TrendArrow.NONE).symbol
+            val graphStart = dateUtil.now() - T.hours(WEAR_GRAPH_HOURS).msecs()
+            val recent = bucketedData.filter { it.timestamp >= graphStart }
+            EventData.GraphData(ArrayList(recent.map { buildSingleBg(it, glucoseStatus, units, lowLine, highLine, slopeArrow) }))
+        }
+
+    // The entries used to carry the send time. Nothing on the watch reads it, but the watch only
+    // writes a list and refreshes its tile when the serialized list differs from the stored one - and
+    // with a fresh time in every entry it always differed. The field stays, for older watches, at 0.
+    private fun AutomationEvent.toWear(): EventData.UserAction.UserActionEntry =
+        EventData.UserAction.UserActionEntry(timeStamp = 0L, id = id, title = title)
 
     suspend fun sendUserActions() {
-        val now = System.currentTimeMillis()
         val filtered = mutableListOf<AutomationEvent>()
         // Automation executes on master only — clients show no user-action tiles (tapping one would
         // run nothing). Send an empty list so the watch clears any stale tiles.
@@ -1373,16 +1396,15 @@ class DataHandlerMobile(
             for (event in automation.events.value) {
                 if (event.userAction && event.isEnabled && event.canRun()) filtered.add(event)
             }
-        sendToWear(EventData.UserAction(ArrayList(filtered.map { it.toWear(now) })))
+        sendToWear(EventData.UserAction(ArrayList(filtered.map { it.toWear() })))
     }
 
-    private fun Scene.toWear(now: Long): EventData.SceneList.SceneEntry =
-        EventData.SceneList.SceneEntry(timeStamp = now, id = id, title = name)
+    private fun Scene.toWear(): EventData.SceneList.SceneEntry =
+        EventData.SceneList.SceneEntry(timeStamp = 0L, id = id, title = name)
 
     fun sendScenes() {
-        val now = System.currentTimeMillis()
         val enabled = scenes.getScenes().filter { it.isEnabled }
-        sendToWear(EventData.SceneList(ArrayList(enabled.map { it.toWear(now) })))
+        sendToWear(EventData.SceneList(ArrayList(enabled.map { it.toWear() })))
     }
 
     /**
@@ -1446,11 +1468,14 @@ class DataHandlerMobile(
         val predictions = arrayListOf<EventData.SingleBg>()
         if (!config.appInitialized) return
         val profile = profileFunction.getProfile() ?: return
+        // One read for the whole window; the 5 min walk below asked the database at every step (66 of
+        // them), on every resend, every BG.
+        val tempBasals = processedTbrEbData.getTempBasalsIncludingConvertedExtended(startTimeWindow, now)
         var beginBasalSegmentTime = startTimeWindow
         var runningTime = startTimeWindow
         var beginBasalValue = profile.getBasal(beginBasalSegmentTime)
         var endBasalValue = beginBasalValue
-        var tb1 = processedTbrEbData.getTempBasalIncludingConvertedExtended(runningTime)
+        var tb1 = tempBasals.at(runningTime)
         var tb2: TB?
         var tbBefore = beginBasalValue
         var tbAmount = beginBasalValue
@@ -1476,7 +1501,7 @@ class DataHandlerMobile(
             }
 
             //temps
-            tb2 = processedTbrEbData.getTempBasalIncludingConvertedExtended(runningTime)
+            tb2 = tempBasals.at(runningTime)
             when {
                 tb1 == null && tb2 == null -> {
                     //no temp stays no temp
@@ -1514,7 +1539,7 @@ class DataHandlerMobile(
             basals.add(EventData.TreatmentData.Basal(beginBasalSegmentTime, runningTime, beginBasalValue))
         }
         if (tb1 != null) {
-            tb2 = processedTbrEbData.getTempBasalIncludingConvertedExtended(now) //use "now" to express current situation
+            tb2 = tempBasals.at(now) //use "now" to express current situation
             if (tb2 == null) {
                 //express the canceled temp by painting it down one minute early
                 temps.add(EventData.TreatmentData.TempBasal(tbStart, tbBefore, now - 60 * 1000, endBasalValue, tbAmount))
@@ -1530,7 +1555,7 @@ class DataHandlerMobile(
                 }
             }
         } else {
-            tb2 = processedTbrEbData.getTempBasalIncludingConvertedExtended(now) //use "now" to express current situation
+            tb2 = tempBasals.at(now) //use "now" to express current situation
             if (tb2 != null) {
                 //onset at the end
                 val profileTB = profileFunction.getProfile(runningTime)
@@ -1621,8 +1646,8 @@ class DataHandlerMobile(
         val openApsStatus =
             if (config.APS) loop.lastRun?.let { if (it.lastTBREnact != 0L) it.lastTBREnact else -1 } ?: -1
             else processedDeviceStatusData.openApsTimestamp
-        // Patient name for followers
-        val patientName = preferences.get(StringKey.GeneralPatientName)
+        // Instance name for followers
+        val instanceName = preferences.get(StringKey.GeneralInstanceName)
         //temptarget
         val units = profileFunction.getUnits()
         var tempTargetLevel = 0
@@ -1680,7 +1705,7 @@ class DataHandlerMobile(
                 openApsStatus = openApsStatus,
                 bgi = bgiString,
                 batteryLevel = if (phoneBattery >= 30) 1 else 0,
-                patientName = patientName,
+                patientName = instanceName, // wire field name is fixed by the watch contract
                 tempTarget = tempTarget,
                 tempTargetLevel = tempTargetLevel,
                 tempTargetDuration = tempTargetDuration,
@@ -1688,7 +1713,7 @@ class DataHandlerMobile(
                 reservoir = reservoir,
                 reservoirLevel = reservoirLevel,
                 loopMode = runningModeRecord.mode.toLoopMode(),
-                modeEndTime = if (runningModeRecord.isTemporary()) runningModeRecord.timestamp + runningModeRecord.duration else null,
+                modeEndTime = runningModeRecord.endTimeForWatch(),
                 modeFromScene = runningModeRecord.id == activeSceneSync.getActiveState()?.scopedRecords?.rmId
             )
         )
@@ -1759,7 +1784,9 @@ class DataHandlerMobile(
         persistenceLayer.getTemporaryTargetActiveAt(dateUtil.now())?.let { tt ->
             // Show the full low–high range (was passing lowTarget twice — a range TT only showed its low bound).
             out += ConfirmationLine(ConfirmationRole.NORMAL, rh.gs(InterfacesStrings.confirmation_line, rh.gs(SyncStrings.temp_target), profileUtil.toTargetRangeString(tt.lowTarget, tt.highTarget, GlucoseUnit.MGDL)))
-            out += ConfirmationLine(ConfirmationRole.INFO, rh.gs(InterfacesStrings.confirmation_line, rh.gs(SyncStrings.until), dateUtil.timeString(tt.end)))
+            // A target without an end (a scene without a duration) has no "until" line.
+            if (tt.hasEnd)
+                out += ConfirmationLine(ConfirmationRole.INFO, rh.gs(InterfacesStrings.confirmation_line, rh.gs(SyncStrings.until), dateUtil.timeString(tt.end)))
         }
         out += ConfirmationLine(ConfirmationRole.NORMAL, rh.gs(InterfacesStrings.confirmation_line, rh.gs(SyncStrings.default_range), profileUtil.toTargetRangeString(profile.getTargetLowMgdl(), profile.getTargetHighMgdl(), GlucoseUnit.MGDL)))
         out += ConfirmationLine(ConfirmationRole.NORMAL, rh.gs(InterfacesStrings.confirmation_line, rh.gs(SyncStrings.target), profileUtil.fromMgdlToStringInUnits(profile.getTargetMgdl())))
@@ -1947,3 +1974,13 @@ class DataHandlerMobile(
     }
 
 }
+
+/**
+ * End time of a temporary mode (suspend / disconnect / superbolus) so the watch can show the
+ * remaining time, or null when there is none to show. A pump suspend has no end the user chose:
+ * `LoopPlugin.runningModePreCheck` stores Int.MAX_VALUE minutes, which the watch showed as
+ * "35791394 h". The Overview chip treats a duration of 30 days or more as open-ended and shows
+ * no time; the same rule here keeps phone and watch in agreement.
+ */
+internal fun RM.endTimeForWatch(): Long? =
+    if (isTemporary() && duration < T.days(30).msecs()) timestamp + duration else null

@@ -224,22 +224,19 @@ class DateUtilImpl(
         return if (abs(minutes) > 9999) "" else rh.gs(InterfacesStrings.minago_long, minutes)
     }
 
-    override fun hourAgo(time: Long, rh: TextResolver): String {
-        val duration = (now() - time).milliseconds
-        // Must match string resources: hoursago uses %1$.1f (float), not integer hours.
-        val hours = duration.toDouble(DurationUnit.HOURS)
-        return rh.gs(InterfacesStrings.hoursago, hours)
-    }
+    override fun hourAgo(time: Long, rh: TextResolver): String =
+        rh.gs(InterfacesStrings.hoursago, (now() - time).milliseconds.toDouble(DurationUnit.HOURS))
 
     override fun dayAgo(time: Long, rh: TextResolver, round: Boolean): String {
         val duration = (now() - time).milliseconds
-        val daysAsDouble = duration.toDouble(DurationUnit.DAYS)
+        // The strings take a floating point number (%1$.1f, %1$.0f), so pass a Double, never a Long
+        val days = duration.toDouble(DurationUnit.DAYS)
         if (round) {
-            return if (duration.isPositive()) rh.gs(InterfacesStrings.days_ago_round, ceil(daysAsDouble))
-            else rh.gs(InterfacesStrings.in_days_round, floor(daysAsDouble))
+            return if (duration.isPositive()) rh.gs(InterfacesStrings.days_ago_round, ceil(days))
+            else rh.gs(InterfacesStrings.in_days_round, floor(days))
         }
-        return if (duration.isPositive()) rh.gs(InterfacesStrings.days_ago, daysAsDouble)
-        else rh.gs(InterfacesStrings.in_days, abs(daysAsDouble))
+        return if (duration.isPositive()) rh.gs(InterfacesStrings.days_ago, days)
+        else rh.gs(InterfacesStrings.in_days, abs(days))
     }
 
     override fun beginOfDay(mills: Long): Long =
@@ -250,10 +247,14 @@ class DateUtilImpl(
 
     override fun timeFrameString(timeInMillis: Long, rh: TextResolver, withParentheses: Boolean): String {
         val duration = timeInMillis.milliseconds
-        val totalHours = duration.inWholeHours
-        val remainingMinutes = (duration - totalHours.hours).inWholeMinutes
-        val hoursPart = if (totalHours > 0) "$totalHours${rh.gs(InterfacesStrings.shorthour)} " else ""
-        val body = "$hoursPart$remainingMinutes'"
+        // A time frame over about 146 million years, like the one to the end of a target without an end, is an
+        // infinite Duration. Infinite minus infinite throws, so it gets its own text.
+        val body = if (duration.isInfinite()) "∞" else {
+            val totalHours = duration.inWholeHours
+            val remainingMinutes = (duration - totalHours.hours).inWholeMinutes
+            val hoursPart = if (totalHours > 0) "$totalHours${rh.gs(InterfacesStrings.shorthour)} " else ""
+            "$hoursPart$remainingMinutes'"
+        }
         return if (withParentheses) "($body)" else body
     }
 

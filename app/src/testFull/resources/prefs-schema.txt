@@ -595,11 +595,15 @@ key_combinedDelta_autodrive_mode|DoubleKey|true
 key_enable_ML_training|BooleanKey|true
 key_enable_basal|BooleanKey|true
 key_equil_alarm_battery_10|EquilBooleanKey|true
+key_equil_alarm_battery_5|EquilBooleanKey|true
 key_equil_alarm_battery|EquilBooleanPreferenceKey|true
+key_equil_alarm_insulin_0|EquilBooleanKey|true
 key_equil_alarm_insulin_10|EquilBooleanKey|true
+key_equil_alarm_insulin_2|EquilBooleanKey|true
 key_equil_alarm_insulin_5|EquilBooleanKey|true
 key_equil_alarm_insulin|EquilBooleanPreferenceKey|true
 key_equil_basal_set|EquilBooleanKey|true
+key_equil_bolus_speed|EquilIntPreferenceKey|true
 key_equil_devices|EquilStringKey|true
 key_equil_emulator_device_name|EquilStringKey|false
 key_equil_pair_password|EquilStringKey|true
@@ -886,7 +890,6 @@ snooze_dst_in24h|DstHelperLongKey|true
 snooze_loop_disabled|DstHelperLongKey|true
 snoozedTo%s|LongComposedKey|true
 startupwizard_processed|BooleanNonKey|true
-stats_activity_expanded|BooleanNonKey|false
 stats_dexcom_tir_expanded|BooleanNonKey|false
 stats_tdd_cycle_expanded|BooleanNonKey|false
 stats_tdd_expanded|BooleanNonKey|false

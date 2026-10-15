@@ -1,5 +1,6 @@
 package app.aaps.persistentNotification
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -44,12 +45,7 @@ class DummyService : MetroService() {
 
     override fun onCreate() {
         super.onCreate()
-        try {
-            aapsLogger.debug("Starting DummyService with ID ${notificationHolder.notificationID} notification ${notificationHolder.notification}")
-            startForeground(notificationHolder.notificationID, notificationHolder.notification)
-        } catch (e: Exception) {
-            startForeground(4711, Notification())
-        }
+        startForegroundSafe()
         rxBus.toFlow(EventAppExit::class)
             .collectResilient(scope, aapsLogger, LTag.CORE, start = CoroutineStart.UNDISPATCHED) {
                 aapsLogger.debug(LTag.CORE, "EventAppExit received")

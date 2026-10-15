@@ -136,6 +136,7 @@ fun MainScreen(
     // Objectives progress
     objectivesSetupPlugin: PluginBase? = null,
     objectivesProgressText: String? = null,
+    objectivesProgressDescription: String? = null,
     // Permissions
     permissionsMissing: Boolean = false,
     onPermissionsClick: () -> Unit = {},
@@ -492,6 +493,7 @@ fun MainScreen(
                             bgQualityBadgeDescription = bgQualityBadgeDescription,
                             objectivesSetupPlugin = objectivesSetupPlugin,
                             objectivesProgressText = objectivesProgressText,
+                            objectivesProgressDescription = objectivesProgressDescription,
                             onNavigate = onNavigate,
                             permissionsMissing = permissionsMissing,
                             onPermissionsClick = onPermissionsClick,
@@ -553,8 +555,9 @@ fun MainScreen(
             onDismiss = { showAutomationSheet = false },
             automationItems = sceneState.items,
             onItemClick = { item -> mainViewModel.requestAutomationConfirmation(item.eventId) },
-            sceneItems = sceneState.sceneItems,
-            onSceneClick = { sceneId -> mainViewModel.requestSceneConfirmation(sceneId) }
+            sceneItems = automationState.sceneItems,
+            onSceneClick = { sceneId -> mainViewModel.requestSceneConfirmation(sceneId) },
+            onEditScenesClick = { onNavigate(NavigationRequest.Element(ElementType.SCENE_MANAGEMENT)) }
         )
     }
 

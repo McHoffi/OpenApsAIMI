@@ -286,7 +286,12 @@ enum class NotificationId(
      * A pre-soak sensor (ONE+ / G7 or Libre 3) was switched to production by itself, without the
      * user pressing the promote button. Appended last on purpose, see the comment above.
      */
-    CGM_STAGING_AUTO_PROMOTED(NORMAL, CGM);
+    CGM_STAGING_AUTO_PROMOTED(NORMAL, CGM),
+
+    // The Combo reported an error, so the driver does not connect until the user has handled it. Its own
+    // id, so that this hint does not replace the card that names the error (COMBO_PUMP_ALARM) (#5263).
+    // Appended at the END for the same reason as above.
+    COMBO_PUMP_ERROR_LOCKOUT(NORMAL, PUMP);
 
     companion object {
 

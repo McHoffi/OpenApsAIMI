@@ -3,6 +3,7 @@ package app.aaps.database.persistence.converters
 import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.aps.CurrentTemp
+import app.aaps.core.interfaces.aps.GlucoseStatus
 import app.aaps.core.interfaces.aps.GlucoseStatusAIMI
 import app.aaps.core.interfaces.aps.GlucoseStatusAutoIsf
 import app.aaps.core.interfaces.aps.GlucoseStatusSMB
@@ -13,6 +14,8 @@ import app.aaps.core.interfaces.aps.OapsProfileAimi
 import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.aps.RT
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.json.Json
 
@@ -51,34 +54,26 @@ private fun sanitizeJson(json: String): String {
 
 fun app.aaps.database.entities.APSResult.fromDb(apsResultProvider: () -> APSResult): APSResult =    when (algorithm) {
         app.aaps.database.entities.APSResult.Algorithm.AMA,
-        app.aaps.database.entities.APSResult.Algorithm.SMB ->
-            apsResultProvider().with(rtJson.decodeFromString(this.resultJson)).also { result ->                result.date = this.timestamp
-                result.glucoseStatus = try {
-                    // Si AIMI a son propre GlucoseStatus, remplace GlucoseStatusSMB ci-dessous
-                    this.glucoseStatusJson?.let { Json.decodeFromString<GlucoseStatusSMB>(it) }
-                } catch (_: Exception) {
-                    null
-                }
-                result.currentTemp = this.currentTempJson?.let { Json.decodeFromString(CurrentTemp.serializer(), it) }
-                result.iobData = this.iobDataJson?.let { Json.decodeFromString(ArraySerializer(IobTotal.serializer()), it) }
-                result.oapsProfile = this.profileJson?.let { Json.decodeFromString(OapsProfile.serializer(), it) }
-                result.mealData = this.mealDataJson?.let { Json.decodeFromString(MealData.serializer(), it) }
-                result.autosensResult = this.autosensDataJson?.let { Json.decodeFromString(AutosensResult.serializer(), it) }
+        app.aaps.database.entities.APSResult.Algorithm.SMB      ->
+            apsResultProvider().with(rtJson.decodeFromString(this.resultJson)).also { result ->
+                result.date = this.timestamp
+                result.glucoseStatus = this.glucoseStatusJson?.toGlucoseStatus(GlucoseStatusSMB.serializer())
+                result.currentTemp = this.currentTempJson?.let { Json.decodeFromString(it) }
+                result.iobData = this.iobDataJson?.let { Json.decodeFromString(it) }
+                result.oapsProfile = this.profileJson?.let { Json.decodeFromString(it) }
+                result.mealData = this.mealDataJson?.let { Json.decodeFromString(it) }
+                result.autosensResult = this.autosensDataJson?.let { Json.decodeFromString(it) }
             }
 
         app.aaps.database.entities.APSResult.Algorithm.AUTO_ISF ->
             apsResultProvider().with(rtJson.decodeFromString(this.resultJson)).also { result ->
                 result.date = this.timestamp
-                result.glucoseStatus = try {
-                    this.glucoseStatusJson?.let { Json.decodeFromString<GlucoseStatusAutoIsf>(it) }
-                } catch (_: Exception) {
-                    null
-                }
-                result.currentTemp = this.currentTempJson?.let { Json.decodeFromString(CurrentTemp.serializer(), it) }
-                result.iobData = this.iobDataJson?.let { Json.decodeFromString(ArraySerializer(IobTotal.serializer()), it) }
-                result.oapsProfileAutoIsf = this.profileJson?.let { Json.decodeFromString(OapsProfileAutoIsf.serializer(), it) }
-                result.mealData = this.mealDataJson?.let { Json.decodeFromString(MealData.serializer(), it) }
-                result.autosensResult = this.autosensDataJson?.let { Json.decodeFromString(AutosensResult.serializer(), it) }
+                result.glucoseStatus = this.glucoseStatusJson?.toGlucoseStatus(GlucoseStatusAutoIsf.serializer())
+                result.currentTemp = this.currentTempJson?.let { Json.decodeFromString(it) }
+                result.iobData = this.iobDataJson?.let { Json.decodeFromString(it) }
+                result.oapsProfileAutoIsf = this.profileJson?.let { Json.decodeFromString(it) }
+                result.mealData = this.mealDataJson?.let { Json.decodeFromString(it) }
+                result.autosensResult = this.autosensDataJson?.let { Json.decodeFromString(it) }
             }
 
         app.aaps.database.entities.APSResult.Algorithm.AIMI -> {
@@ -99,6 +94,21 @@ fun app.aaps.database.entities.APSResult.fromDb(apsResultProvider: () -> APSResu
         }
 
         else -> error("Unsupported")
+    }
+
+/**
+ * Reads the glucose status with the same class that [toDb] wrote.
+ *
+ * `GlucoseStatus` is an interface, so decoding to it always failed and every result came back without
+ * a glucose status. The APS plugins then loaded no variable sensitivity at start, and the 24 h average
+ * ISF for the wizard and COB was lost on every restart (#4589). A row that cannot be read loses only
+ * its glucose status, not the whole result.
+ */
+private fun <T : GlucoseStatus> String.toGlucoseStatus(serializer: KSerializer<T>): T? =
+    try {
+        rtJson.decodeFromString(serializer, this)
+    } catch (_: SerializationException) {
+        null
     }
 
 @OptIn(ExperimentalSerializationApi::class)

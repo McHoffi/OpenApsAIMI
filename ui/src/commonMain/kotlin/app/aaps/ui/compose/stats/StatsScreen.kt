@@ -295,12 +295,4 @@ fun StatsScreen(
             onDismiss = { viewModel.dismissRecalculateDialog() }
         )
     }
-
-    if (state.showResetActivityDialog) {
-        OkCancelDialog(
-            message = stringResource(UiStrings.do_you_want_reset_stats),
-            onConfirm = { viewModel.confirmResetActivityStats() },
-            onDismiss = { viewModel.dismissResetActivityDialog() }
-        )
-    }
 }

@@ -42,7 +42,6 @@ import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.TextRef
-import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.ui.compose.MetroViewModelFactoryOwner
 import app.aaps.core.ui.locale.LocaleHelper
 import app.aaps.database.di.DatabaseConfig
@@ -132,7 +131,6 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
 
     private val pluginStore get() = metroGraphs.pluginStore
     private val aapsLogger get() = metroGraphs.aapsLogger
-    private val activityMonitor get() = metroGraphs.activityMonitor
     private val versionCheckersUtils get() = metroGraphs.versionCheckerUtils
     private val sp get() = metroGraphs.sp
     private val preferences get() = metroGraphs.preferences
@@ -170,7 +168,7 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
     private val widgetUpdater get() = metroGraphs.widgetUpdater
     private val runningModeReconciler get() = metroGraphs.runningModeReconciler
     private val runningModeExpiryScheduler get() = metroGraphs.runningModeExpiryScheduler
-    private val profileSwitchExpiryScheduler get() = metroGraphs.profileSwitchExpiryScheduler
+    private val profileSwitchScheduler get() = metroGraphs.profileSwitchScheduler
     private val automationRuntime get() = metroGraphs.automationRuntime
     private val snackbarNotificationFallback get() = metroGraphs.snackbarNotificationFallback
     private val appScope get() = metroGraphs.applicationScope
@@ -184,8 +182,7 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
      *
      * `doMigrations` used to remove them as it read them, which put the only copy of those DIA
      * values in the map above - a field, in memory. `dataMigrations` is the only consumer and runs
-     * much later, after `vacuumDatabaseIfDue` (which documents that it can take the process down
-     * below the JVM, where no `catch` reaches) and after the plugins start. A death anywhere in that
+     * much later, after `maintainDatabaseIfDue` and after the plugins start. A death anywhere in that
      * gap lost the DIA values for good: the next start finds no keys, takes the empty branch and
      * stamps the old records with a substituted insulin instead. That is wrong IOB on historical
      * records and it is one-way - the sentinel is consumed and those rows are never revisited.
@@ -271,7 +268,7 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
                 runningModeExpiryScheduler.start()
                 // Fires a profile change at the exact end of a temporary ProfileSwitch (master-only),
                 // removing the up-to-5-min KeepAlive latency. KeepAlive remains the backstop.
-                profileSwitchExpiryScheduler.start()
+                profileSwitchScheduler.start()
 
                 // Standalone automation runtime (no longer a plugin). Loads definitions on all
                 // flavors; the processing loop + location service are master-only (gated internally).
@@ -289,11 +286,6 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         }
     }
 
-    // Perform a full VACUUM at most once a month. VACUUM defragments the DB file and reclaims
-    // space, restoring query performance that degrades after long use. It is heavy and memory
-    // intensive, so it runs only here at startup while nothing else touches the DB (this avoids
-    // the SQLITE_NOMEM crash seen when VACUUM overlapped live DB activity).
-
     private suspend fun doInit() {
         aapsLogger.debug("doInit")
         RxDogTag.install()
@@ -306,7 +298,6 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
             gitRemote = null
             commitHash = null
         }
-        registerActivityLifecycleCallbacks(activityMonitor)
         aapsLogger.debug("Version: " + config.VERSION_NAME)
         aapsLogger.debug("BuildVersion: " + config.BUILD_VERSION)
         aapsLogger.debug("Remote: " + config.REMOTE)
@@ -699,7 +690,9 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         val runningICfg = if (profileNameToDia.isEmpty())
             profileFunction.getRunningOrRequestedICfg() ?: substituteICfgForMigration()
         else {
-            val dia = (profileFunction.getProfile() as ProfileSealed.EPS?)?.profileName?.let { profileName ->
+            // The record, not profileFunction.getProfile(): this runs before app init completes, and no
+            // profile is handed out until then. ProfileSealed.EPS.profileName is this same field.
+            val dia = persistenceLayer.getEffectiveProfileSwitchActiveAt(dateUtil.now())?.originalProfileName?.let { profileName ->
                 profileNameToDia[profileName]
             }
             val insulinEndTime = ((dia ?: hardLimits.diaRange().endInclusive) * 3600 * 1000).toLong()
@@ -709,7 +702,10 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
             }
         }
 
-        if (!localInsulinManager.insulinAlreadyExists(runningICfg))
+        // Runs at every start, so it must match by curve, not by label. The running profile keeps the label it
+        // was made with, and the list rebuilds every label at start. A label match failed every time for a
+        // profile with an older label, and added one more copy of the same insulin at each start.
+        if (!localInsulinManager.insulinWithSameCurveExists(runningICfg))
             localInsulinManager.addNewInsulin(runningICfg, keepName = true)
 
         // The DIA these keys carry is now in the insulin list, so the old copies can go. This is the
@@ -849,7 +845,6 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         handler.removeCallbacksAndMessages(null)
         handler.looper.quitSafely()
         unregisterReceivers()
-        unregisterActivityLifecycleCallbacks(activityMonitor)
         uiInteraction.stopAlarm("onTerminate")
         super.onTerminate()
     }

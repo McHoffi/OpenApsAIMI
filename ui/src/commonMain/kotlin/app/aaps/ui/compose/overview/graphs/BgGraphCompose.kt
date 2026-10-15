@@ -63,6 +63,7 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.compose.cartesian.decoration.HorizontalBox
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.marker.CartesianMarker
@@ -145,6 +146,9 @@ private class MutableYRangeProvider(
  *
  * Basal Y-axis is scaled so maxBasal occupies [BASAL_HEIGHT_FRACTION] of the chart height (maxY = maxBasal / BASAL_HEIGHT_FRACTION).
  *
+ * The insulin activity overlay has no axis of its own: it is mapped into the BG axis' units with
+ * zero at the low mark (see [activityOverlayScale]), and never changes the BG scale.
+ *
  * Scroll/Zoom:
  * - Accepts external scroll/zoom states for synchronization with secondary graphs
  * - This is the primary interactive graph - user controls scroll/zoom here
@@ -195,6 +199,8 @@ fun BgGraphCompose(
      * Uses Vico marker hit-testing (scroll/zoom aware). Overview leaves this null.
      */
     onDashboardSmbMarkerTap: @Composable ((ChartSmbMarker) -> Unit)? = null,
+    /** Press and hold to see the values at a reading. Null turns it off. */
+    inspect: GraphInspectState? = null,
     modifier: Modifier = Modifier
 ) {
     val dateUtil = LocalDateUtil.current
@@ -316,6 +322,7 @@ fun BgGraphCompose(
         currentTargetData: TargetLineData,
         currentEpsPoints: List<EpsGraphPoint>,
         currentActivityData: ActivityGraphData,
+        currentActivityScale: ActivityOverlayScale,
         currentMinBgY: Double,
         currentMaxBgY: Double,
         currentTreatmentData: TreatmentGraphData,
@@ -458,26 +465,27 @@ fun BgGraphCompose(
                 }
             }
 
-            // Block 5 → Activity layer (layer 4, start axis — Y-values normalized to BG coordinate space)
-            // Scale so maxActivity maps to 80% of maxBgY (same as legacy: maxY * 0.8 / maxIAValue)
+            // Block 5 → Activity layer (layer 4, start axis — Y-values mapped into BG coordinate space)
+            // Zero activity is drawn at the low mark, the bottom edge of the green in-range belt:
+            // a natural horizontal reference, with the room between it and the BG axis floor left
+            // for the rare negative excursion. Scale comes from the visible window only — see
+            // activityOverlayScale and the LaunchedEffect below.
             lineModel {
-                val maxAct = currentActivityData.maxActivity
-                if (!showActivityOnMainChart || maxAct <= 0.0 || currentActivityData.activity.size < 2) {
+                if (!showActivityOnMainChart || currentActivityScale.scale <= 0.0 || currentActivityData.activity.size < 2) {
                     // Activity disabled or no data — emit dummy series (history + prediction)
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                     return@lineModel
                 }
-                val scaleFactor = (currentMaxBgY - currentMinBgY) * 0.8 / maxAct
 
                 val pts = currentActivityData.activity
-                    .map { timestampToX(it.timestamp, minTimestamp) to (currentMinBgY + it.value * scaleFactor) }
+                    .map { timestampToX(it.timestamp, minTimestamp) to currentActivityScale.map(it.value) }
                     .sortedBy { it.first }
                 series(x = pts.map { it.first }, y = pts.map { it.second })
 
                 if (currentActivityData.activityPrediction.size >= 2) {
                     val predPts = currentActivityData.activityPrediction
-                        .map { timestampToX(it.timestamp, minTimestamp) to (currentMinBgY + it.value * scaleFactor) }
+                        .map { timestampToX(it.timestamp, minTimestamp) to currentActivityScale.map(it.value) }
                         .sortedBy { it.first }
                     series(x = predPts.map { it.first }, y = predPts.map { it.second })
                 } else {
@@ -552,13 +560,15 @@ fun BgGraphCompose(
         }
         // maxBgY/minBgY clamped against highMark/lowMark. Only the visible window counts when one
         // is given, so a zoomed-in high reading does not flatten the rest of the chart (#5245).
+        // Predictions count too: a window with only future prediction data must not fall back to
+        // the full history's max.
         fun inWindow(timestamp: Long) = visibleTimeRange == null || timestamp in visibleTimeRange.first..visibleTimeRange.second
-        val allBgValues = (bgReadings + bucketedData).map { it.value }
-        val windowedBgValues = (bgReadings + bucketedData).filter { inWindow(it.timestamp) }.map { it.value }
-        val valuesForScale = windowedBgValues.ifEmpty { allBgValues }
-        var maxBgY = if (valuesForScale.isNotEmpty()) maxOf(valuesForScale.max(), chartConfig.highMark) else chartConfig.highMark
+        val allBgAndPredictionValues = (bgReadings + bucketedData + predictions).map { it.value }
+        val windowedValues = (bgReadings + bucketedData + predictions).filter { inWindow(it.timestamp) }.map { it.value }
+        val valuesForScale = windowedValues.ifEmpty { allBgAndPredictionValues }
+        val maxBgY = if (valuesForScale.isNotEmpty()) maxOf(valuesForScale.max(), chartConfig.highMark) else chartConfig.highMark
         val minBgY = if (valuesForScale.isNotEmpty()) minOf(valuesForScale.min(), chartConfig.lowMark) else chartConfig.lowMark
-        rebuildChart(basalData, targetData, epsPoints, activityData, minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
+
         val sortedBgAsc = bgReadings.sortedBy { it.timestamp }
         val fallbackSmbY = viewModel.glucoseDisplayYToMgdl(
             (chartConfig.lowMark + chartConfig.highMark) / 2.0,
@@ -581,17 +591,24 @@ fun BgGraphCompose(
                     )
                 }
             }
-        // Activity layer shares BG axis — scale in display units (legacy GraphData maxY).
-        val bgDisplay = (bgReadings + bucketedData).map { viewModel.glucoseMgdlToChartY(it.value) }
-        val targetPeakDisplay =
-            targetData.targets.maxOfOrNull { viewModel.glucoseMgdlToChartY(it.value) }
-                ?: Double.NEGATIVE_INFINITY
-        maxBgY = if (bgDisplay.isNotEmpty()) {
-            maxOf(bgDisplay.max(), chartConfig.highMark, targetPeakDisplay)
-        } else {
-            maxOf(chartConfig.highMark, targetPeakDisplay)
-        }
-        rebuildChart(basalData, targetData, epsPoints, activityData,minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
+
+        // Activity overlay: zero anchored on the low mark (bottom edge of the green in-range belt),
+        // scaled from the visible window like every other curve. The BG axis above is never changed
+        // to fit it — the activity is fitted into the room the BG axis already leaves on each side
+        // of the low mark. Prediction points count too, same reason as for the BG values above.
+        val windowedActivity = (activityData.activity + activityData.activityPrediction)
+            .filter { inWindow(it.timestamp) }
+            .map { it.value }
+            .ifEmpty { (activityData.activity + activityData.activityPrediction).map { it.value } }
+        val activityScale = activityOverlayScale(
+            activityMin = windowedActivity.minOrNull() ?: 0.0,
+            activityMax = windowedActivity.maxOrNull() ?: 0.0,
+            zeroLevel = chartConfig.lowMark,
+            roomAbove = maxBgY - chartConfig.lowMark,
+            roomBelow = chartConfig.lowMark - minBgY
+        )
+
+        rebuildChart(basalData, targetData, epsPoints, activityData, activityScale, minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
     }
 
     // Time formatter and axis configuration
@@ -1047,6 +1064,11 @@ fun BgGraphCompose(
         terminalGlowColor = scenarioBestColor,
     )
 
+    val inspectMarker = remember(inspect) { inspect?.let { GraphInspectMarker(it) } }
+    // Always called, so the composable calls do not depend on inspect
+    val defaultMarkerController = CartesianMarkerController.rememberShowOnPress()
+    val inspectLine = rememberInspectLine(inspect)
+
     val decorations = remember(
         targetRangeBandDecoration,
         scenarioDecorations,
@@ -1055,6 +1077,7 @@ fun BgGraphCompose(
         overviewSmbDecoration,
         dashboardSmbDecoration,
         nowLine,
+        inspectLine,
     ) {
         buildList {
             targetRangeBandDecoration?.let { add(it) }
@@ -1062,12 +1085,12 @@ fun BgGraphCompose(
             addAll(scenarioDecorations)
             tbrDecoration?.let { add(it) }
             add(nowLine)
+            inspectLine?.let { add(it) }
             overviewSmbDecoration?.let { add(it) }
             dashboardSmbDecoration?.let { add(it) }
         }
     }
 
-    val defaultMarkerController = CartesianMarkerController.rememberShowOnPress()
     val smbTouchRadiusPx = with(LocalDensity.current) { chartStyle.smbMarkerTouchRadius.toPx() }
     val dashboardSmbTapController =
         remember(
@@ -1188,8 +1211,9 @@ fun BgGraphCompose(
                 guideline = LineComponent(fill = Fill(guidelineColor))
             ),
             decorations = decorations,
-            marker = if (dashboardSmbTapController != null) dashboardSmbTapMarker else null,
-            markerController = dashboardSmbTapController ?: defaultMarkerController,
+            marker = if (dashboardSmbTapController != null) dashboardSmbTapMarker else inspectMarker,
+            markerVisibilityListener = inspect?.visibilityListener,
+            markerController = dashboardSmbTapController ?: inspect?.controller ?: defaultMarkerController,
             getXStep = { _, _, _ -> 1.0 }
         ),
         modelProducer = modelProducer,

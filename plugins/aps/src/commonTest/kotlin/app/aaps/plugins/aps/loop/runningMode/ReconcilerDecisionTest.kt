@@ -243,6 +243,8 @@ class ReconcilerDecisionTest {
 
     @Test
     fun `suspended by pump to anything is no-op`() {
+        // The reconciler passes the mode from before the pump suspend instead (#4486), see
+        // RunningModeReconcilerTest "pump runs again ...".
         RM.Mode.entries.forEach { next ->
             assertEquals(ReconcilerDecision.Action.NoOp, ReconcilerDecision.decide(RM.Mode.SUSPENDED_BY_PUMP, next))
         }
