@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Covers [LoopStatusData] + nested [TempTargetInfo]/[TargetRange]/[OapsResultInfo]/LoopMode via JSON round-trip. */
 class LoopStatusDataTest {
@@ -61,7 +62,7 @@ class LoopStatusDataTest {
             sensitivity = listOf("Autosens Value: 95%", "ISF (profile): 3.5")
         )
         val restored = json.decodeFromString(LoopStatusData.serializer(), json.encodeToString(LoopStatusData.serializer(), data))
-        assertThat(restored).isEqualTo(data)
+        assertEquals(data, restored)
     }
 
     @Test
@@ -71,10 +72,10 @@ class LoopStatusDataTest {
             """"tempTarget":{"targetDisplay":"100","endTime":5000,"durationMinutes":30,"units":"mg/dl"},""" +
             """"defaultRange":{"lowDisplay":"a","highDisplay":"b","targetDisplay":"c","units":"u"},"oapsResult":null}"""
         val decoded = json.decodeFromString(LoopStatusData.serializer(), legacy)
-        assertThat(decoded.profile).isNull()
-        assertThat(decoded.tempTarget?.fromScene).isFalse()
-        assertThat(decoded.modeFromScene).isFalse()
-        assertThat(decoded.sensitivity).isEmpty()
+        assertNull(decoded.profile)
+        assertEquals(false, decoded.tempTarget?.fromScene)
+        assertEquals(false, decoded.modeFromScene)
+        assertTrue(decoded.sensitivity.isEmpty())
     }
 
     @Test

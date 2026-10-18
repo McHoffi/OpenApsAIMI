@@ -394,9 +394,6 @@ internal class GraphUtilsTest {
             }
         }
     }
-            }
-        }
-    }
 
     @Nested
     inner class PredictionFadeAlphaTest {

@@ -1,6 +1,6 @@
 package app.aaps.database
 
-import app.aaps.database.di.MIGRATION_35_TO_36_PAIRS
+import app.aaps.database.di.MIGRATION_37_TO_38_PAIRS
 import app.aaps.database.entities.GlucoseValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,13 +58,13 @@ class ConvertersSourceSensorTest {
     }
 
     /**
-     * `migration35to36` rewrites the column so that the queries comparing it as text keep matching.
+     * `migration37to38` rewrites the column so that the queries comparing it as text keep matching.
      * It spells its pairs out, because a migration has to keep doing the same thing forever, so this
      * checks the two agree today rather than letting them drift apart unnoticed.
      */
     @Test
     fun `the migration rewrites every legacy name this map knows`() {
-        val migrated = MIGRATION_35_TO_36_PAIRS
+        val migrated = MIGRATION_37_TO_38_PAIRS
         assertEquals(LEGACY_SOURCE_SENSOR_NAMES.size, migrated.size)
         LEGACY_SOURCE_SENSOR_NAMES.forEach { (legacy, entry) ->
             assertEquals(entry.name, migrated[legacy], legacy)

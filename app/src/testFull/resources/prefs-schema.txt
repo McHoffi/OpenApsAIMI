@@ -106,6 +106,7 @@ aimi_activity_source_mode|AimiStringKey|true
 aimi_adaptation_status_compose|ApsIntentKey|false
 aimi_adaptive_basal_reenabled_on_upgrade|BooleanNonKey|false
 aimi_advisor_claude_key|StringKey|true
+aimi_advisor_claude_model|AimiStringKey|true
 aimi_advisor_deepseek_key|StringKey|true
 aimi_advisor_gemini_key|StringKey|true
 aimi_advisor_openai_key|StringKey|true
@@ -192,6 +193,7 @@ aimi_priority_max_iob_extra_u|DoubleKey|true
 aimi_priority_max_iob_factor|DoubleKey|true
 aimi_red_carpet_restore_threshold|DoubleKey|true
 aimi_remote_control_pin|AimiStringKey|true
+aimi_settings_audit_compose|ApsIntentKey|false
 aimi_smb_exercise_damping|DoubleKey|true
 aimi_smb_late_fat_damping|DoubleKey|true
 aimi_smb_tail_damping|DoubleKey|true
@@ -373,6 +375,8 @@ danars_v3_randomsync_key_%s|DanaStringComposedKey|true
 device_type|MedtrumIntNonKey|true
 dexcom_lognssensorchange|BooleanKey|true
 dexcom_oneplus_send_calibration_to_sensor|DexcomOnePlusBooleanKey|false
+dexcom_oneplus_staging_auto_promote_hours|DexcomOnePlusIntKey|true
+dexcom_oneplus_staging_auto_promote|DexcomOnePlusBooleanKey|false
 dexcom_oneplus_start|DexcomOnePlusIntentKey|false
 dexcom_oneplus_status|DexcomOnePlusIntentKey|false
 dexcom_oneplus_use_real_skeleton|DexcomOnePlusBooleanKey|false
@@ -508,8 +512,10 @@ key_aimi_context_enabled|BooleanKey|true
 key_aimi_context_llm_enabled|BooleanKey|true
 key_aimi_descent_redose_guard|BooleanKey|true
 key_aimi_dia_governor_enabled|BooleanKey|true
+key_aimi_dynamic_basal_stack_cap|BooleanKey|true
 key_aimi_effective_iob_release_enabled|BooleanKey|true
 key_aimi_effort_activity_protection|BooleanKey|true
+key_aimi_forced_tbr_real_pred_delta|BooleanKey|true
 key_aimi_gov_anticipation_decay_blend_max|DoubleKey|true
 key_aimi_gov_anticipation_hypo_damp|DoubleKey|true
 key_aimi_gov_anticipation_lookback_samples|DoubleKey|true
@@ -541,6 +547,7 @@ key_aimi_loop_exclusive_invocation|BooleanKey|true
 key_aimi_meal_confirmed_early_release|BooleanKey|true
 key_aimi_meal_hyper_bypass_enabled|BooleanKey|true
 key_aimi_peak_governor_enabled|BooleanKey|true
+key_aimi_pkpd_curve_learning_gate|BooleanKey|true
 key_aimi_pkpd_enabled|BooleanKey|true
 key_aimi_pkpd_endo_reversion|BooleanKey|true
 key_aimi_pkpd_hyper_reversion|BooleanKey|true
@@ -578,13 +585,16 @@ key_aimi_thyroid_treatment_phase|StringKey|true
 key_aimi_tpo_enabled|BooleanKey|true
 key_aimi_tpo_llm_confirm_enabled|BooleanKey|true
 key_aimi_tpo_notify_on_apply|BooleanKey|true
+key_aimi_traj_bridge_basal_survives|BooleanKey|true
 key_aimi_trajectory_guard_enabled|BooleanKey|true
 key_aimi_tree_meal_rise_frontload|BooleanKey|true
 key_aimi_tube_aggressiveness|DoubleKey|true
 key_aimi_tube_basal_trim_max|DoubleKey|true
 key_aimi_tube_hyper_band_mgdl|DoubleKey|true
+key_aimi_tube_hyper_clamp_physical_bound|BooleanKey|true
 key_aimi_tube_hypo_floor_mgdl|DoubleKey|true
 key_aimi_tube_kappa_margin|DoubleKey|true
+key_aimi_tube_veto_ignore_floor_artefact|BooleanKey|true
 key_aimi_undeclared_cob_enabled|BooleanKey|true
 key_aimi_undeclared_cob_max_g|DoubleKey|true
 key_aimiweight|DoubleKey|true
@@ -696,6 +706,8 @@ last_versionchecker_warning|VersionCheckerLongKey|true
 lgsThreshold|UnitDoubleKey|true
 libre3_keep_session_alive|Libre3BooleanKey|false
 libre3_presoak_enabled|Libre3BooleanKey|false
+libre3_staging_auto_promote_hours|Libre3IntKey|true
+libre3_staging_auto_promote|Libre3BooleanKey|false
 libre3_start|Libre3IntentKey|false
 libre3_status|Libre3IntentKey|false
 libre3_use_real_skeleton|Libre3BooleanKey|false
@@ -730,6 +742,8 @@ nextPumpDisconnectedAlarm|LocalAlertLongKey|false
 nextRapidFallAlarm|LocalAlertLongKey|false
 notification_reader_dedup_state|StringNonKey|true
 notification_reader_packages|StringNonKey|true
+ns_activity_heart_rate_last_uploaded_at|NsclientLongKey|false
+ns_activity_steps_last_uploaded_at|NsclientLongKey|false
 ns_alarm_stale_data_value|IntKey|true
 ns_alarm_urgent_stale_data_value|IntKey|true
 ns_alarms|BooleanKey|true
@@ -769,6 +783,8 @@ ns_sync_slow|BooleanKey|true
 ns_temporary_basal_last_synced_id|NsclientLongKey|false
 ns_temporary_target_last_sync|NsclientLongKey|false
 ns_therapy_event_last_sync|NsclientLongKey|false
+ns_upload_heart_rate|BooleanKey|true
+ns_upload_steps|BooleanKey|true
 ns_upload|BooleanKey|true
 ns_use_ws|BooleanKey|true
 ns_wifi_ssids|StringKey|true
@@ -813,6 +829,7 @@ openhumans_project_member_id|OhStringKey|true
 openhumans_refresh_token|OhStringKey|true
 openhumans_upload_offset|OhLongKey|false
 overview_dashboard_extended_metrics|BooleanKey|true
+overview_glass_look|BooleanKey|true
 overview_show_hybrid_aimi_pulse|BooleanKey|true
 overview_use_dashboard|BooleanKey|true
 overview_vico_bg_reading_tint|StringKey|true
@@ -890,6 +907,7 @@ snooze_dst_in24h|DstHelperLongKey|true
 snooze_loop_disabled|DstHelperLongKey|true
 snoozedTo%s|LongComposedKey|true
 startupwizard_processed|BooleanNonKey|true
+stats_activity_expanded|BooleanNonKey|false
 stats_dexcom_tir_expanded|BooleanNonKey|false
 stats_tdd_cycle_expanded|BooleanNonKey|false
 stats_tdd_expanded|BooleanNonKey|false

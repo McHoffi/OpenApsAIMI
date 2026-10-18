@@ -131,7 +131,7 @@ Reference: [CAPTCG/AndroidAPS-Eversense-](https://github.com/CAPTCG/AndroidAPS-E
   `HardLimitsMock.kt` (fork DIA/ISF widenings and inhaled-insulin limits re-expressed as ranges),
   `ProfileSealed.kt` + `InsulinManagementViewModel.kt` (fork Afrezza heuristics on the new API),
   `AdaptiveDoublePreference.kt`, `StepCountListener.kt` (fork `synchronized`),
-  `PrepareGraphDataWorker.kt` (fork warm-start + upstream hoisted sensitivity inputs).
+  `PrepareGraphDataRunner.kt` (then still named PrepareGraphDataWorker; fork warm-start + upstream hoisted sensitivity inputs).
 - **AIMI parity ported:** non-finite `round()` guards and the `setTempBasal` non-finite-rate fallback
   into `DetermineBasalAIMI2`; the whole `HardLimits` range API into `OpenAPSAIMIPlugin`.
 - **Eversense / ONE+ / fork preserved:** verified by an invariant-baseline diff that is **byte-identical**

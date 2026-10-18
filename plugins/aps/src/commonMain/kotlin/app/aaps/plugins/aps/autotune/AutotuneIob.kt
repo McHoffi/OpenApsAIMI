@@ -41,8 +41,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.json.JSONArray
-import org.json.JSONObject
 import kotlin.math.ceil
 
 @SingleIn(AppScope::class)

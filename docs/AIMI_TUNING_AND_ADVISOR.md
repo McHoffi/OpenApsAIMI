@@ -226,7 +226,7 @@ Légende : ✅ Apply | ℹ️ Guidance / lecture seule | 📖 Snapshot lu mais p
 
 ### Plugin Calibration (hors arbre AIMI principal)
 
-| No calibration / Linear calibration | ❌ — pipeline `PrepareGraphDataWorker`, pas Advisor |
+| No calibration / Linear calibration | ❌ — pipeline `PrepareGraphDataRunner`, pas Advisor |
 
 ---
 
