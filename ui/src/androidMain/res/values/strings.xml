@@ -285,7 +285,6 @@
     <string name="valid_from_to">Valid Time Range</string>
     <string name="carb_time">Carb Time</string>
     <string name="save_changes_question">Save changes to this entry?</string>
-    <string name="wizard_no_insulin_required">No insulin required</string>
     <string name="carbs_constraint_violation">Carbs limited by constraints</string>
     <string name="insulin_constraint_violation">Insulin limited by constraints</string>
     <string name="confirm_treatment">Please confirm treatment</string>

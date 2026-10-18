@@ -37,6 +37,7 @@ import app.aaps.core.interfaces.pump.PumpWithConcentration
 import app.aaps.core.interfaces.pump.defs.fillFor
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.rx.weardata.EventData
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.objects.runningMode.RunningModeGuard
@@ -1312,7 +1313,8 @@ class WizardBolusExecutorImplTest : TestBaseWithProfile() {
         // The step is the interface default, read from the description; a plain mock would answer 0.0.
         whenever(pump.bolusStepSize(any())).thenCallRealMethod()
         whenever(constraintsChecker.applyCarbsConstraints(any())).thenAnswer { it.getArgument<Constraint<Int>>(0) }
-        whenever(rh.gs(any<Int>())).thenReturn("No insulin required")
+        // rh.gs(TextRef) is what the executor calls; the Int overload is the old ResourceHelper API.
+        whenever(rh.gs(any<TextRef>())).thenReturn("No insulin required")
         val entry = mock<QuickWizardEntry>()
         whenever(quickWizard.get("g")).thenReturn(entry)
         whenever(entry.carbs()).thenReturn(0)
@@ -1338,7 +1340,7 @@ class WizardBolusExecutorImplTest : TestBaseWithProfile() {
         // verifySelectionInCategories() populated activeAPS) must be rejected here — NOT crash later in
         // BolusWizard.doCalc with "APS not defined". The guard bails before any plugin / profile access.
         whenever(config.appInitialized).thenReturn(false)
-        whenever(rh.gs(any<Int>())).thenReturn("Initializing…")
+        whenever(rh.gs(any<TextRef>())).thenReturn("Initializing…")
         val executor = create()
 
         val result = executor.prepareQuickWizard("g")

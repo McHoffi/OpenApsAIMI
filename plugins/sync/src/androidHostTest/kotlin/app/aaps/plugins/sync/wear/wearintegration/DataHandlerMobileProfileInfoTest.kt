@@ -9,6 +9,8 @@ import app.aaps.core.interfaces.bolus.BatchExecutor
 import app.aaps.core.interfaces.bolus.WizardBolusExecutor
 import app.aaps.core.interfaces.bolus.WizardExecutor
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.insulin.InsulinManager
+import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.maintenance.ImportExportPrefs
 import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.pump.PumpStatusProvider
@@ -50,6 +52,8 @@ class DataHandlerMobileProfileInfoTest : TestBaseWithProfile() {
     @Mock private lateinit var wizardBolusExecutor: WizardBolusExecutor
     @Mock private lateinit var batchExecutor: BatchExecutor
     @Mock private lateinit var wizardExecutor: WizardExecutor
+    @Mock private lateinit var insulinManager: InsulinManager
+    @Mock private lateinit var uel: UserEntryLogger
 
     private lateinit var sut: DataHandlerMobile
 
@@ -61,9 +65,9 @@ class DataHandlerMobileProfileInfoTest : TestBaseWithProfile() {
             context, rxBus, aapsLogger, rh, preferences, config,
             iobCobCalculator, processedTbrEbData, smbGlucoseStatusProvider, profileFunction, profileUtil,
             loop, processedDeviceStatusData, receiverStatusStore, quickWizard, trendCalculator, dateUtil,
-            constraintsChecker, activePlugin, commandQueue, fabricPrivacy, uiInteraction,
+            constraintsChecker, activePlugin, insulinManager, commandQueue, fabricPrivacy, uiInteraction,
             persistenceLayer, importExportPrefs, decimalFormatter, pumpStatusProvider,
-            ch, runningModeGuard, wizardBolusExecutor, batchExecutor, wizardExecutor
+            ch, runningModeGuard, wizardBolusExecutor, batchExecutor, wizardExecutor, uel
         )
     }
 

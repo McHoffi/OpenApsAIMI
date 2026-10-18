@@ -1,5 +1,6 @@
 package app.aaps.ui.compose.stats.viewmodels
 
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.profile.ProfileUtil
@@ -9,6 +10,7 @@ import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.stats.TirCalculator
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.ui.activityMonitor.ActivityStatsProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,12 +29,14 @@ internal class StatsViewModelTest {
     @Mock private lateinit var tddCalculator: TddCalculator
     @Mock private lateinit var tirCalculator: TirCalculator
     @Mock private lateinit var dexcomTirCalculator: DexcomTirCalculator
+    @Mock private lateinit var activityMonitor: ActivityStatsProvider
     @Mock private lateinit var persistenceLayer: PersistenceLayer
     @Mock private lateinit var rh: ResourceHelper
     @Mock private lateinit var uel: UserEntryLogger
     @Mock private lateinit var dateUtil: DateUtil
     @Mock private lateinit var profileUtil: ProfileUtil
     @Mock private lateinit var preferences: Preferences
+    @Mock private lateinit var config: Config
 
     private lateinit var sut: StatsViewModel
 
@@ -45,8 +49,8 @@ internal class StatsViewModelTest {
         // unstubbed mocks) -> tddCycleExpanded is false, so loadCyclePatternData() is never invoked.
         Dispatchers.setMain(StandardTestDispatcher())
         sut = StatsViewModel(
-            tddCalculator, tirCalculator, dexcomTirCalculator, persistenceLayer,
-            rh, uel, dateUtil, profileUtil, preferences
+            tddCalculator, tirCalculator, dexcomTirCalculator, activityMonitor, persistenceLayer,
+            rh, uel, dateUtil, profileUtil, preferences, config
         )
     }
 

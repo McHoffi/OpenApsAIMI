@@ -402,6 +402,10 @@ class LoopPluginTest : TestBaseWithProfile() {
         whenever(dateUtil.now()).thenReturn(now)
         whenever(persistenceLayer.getRunningModeActiveAt(now)).thenReturn(current)
         whenever(persistenceLayer.insertOrUpdateRunningMode(any(), any(), any(), anyOrNull(), any())).thenReturn(PersistenceLayer.TransactionResult())
+        // suspendLoop() cancels the temp basal through the queue; an unstubbed mock answers null.
+        whenever(commandQueue.cancelTempBasal(any(), any())).thenReturn(
+            pumpEnactResultProvider().success(true).enacted(true)
+        )
 
         // Act
         loopPlugin.handleRunningModeChange(

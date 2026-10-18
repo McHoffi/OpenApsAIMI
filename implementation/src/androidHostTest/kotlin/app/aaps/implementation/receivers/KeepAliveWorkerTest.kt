@@ -246,6 +246,7 @@ class KeepAliveWorkerTest : TestBaseWithProfile() {
 
     /** #2454: the pump rounded the basal, so the running profile holds other rates than the requested one. */
     private suspend fun requestedPsRunningFrom(psId: Long) {
+        stubRunningMode(RM.Mode.OPEN_LOOP)
         whenever(loop.runningMode()).thenReturn(RM.Mode.OPEN_LOOP)
         whenever(profileFunction.getRequestedProfile()).thenReturn(profileSwitch.copy(id = 140))
         // Built before whenever(): the constructor reads activePlugin, a mock.
@@ -283,6 +284,7 @@ class KeepAliveWorkerTest : TestBaseWithProfile() {
     @Test
     fun `checkPump does not read the status when the pump gives the rounded rate of the running profile`() = runTest {
         worker = createWorker()
+        stubRunningMode(RM.Mode.OPEN_LOOP)
         whenever(loop.runningMode()).thenReturn(RM.Mode.OPEN_LOOP)
         whenever(profileFunction.getRequestedProfile()).thenReturn(profileSwitch.copy(id = 140, basalBlocks = listOf(Block(T.hours(24).msecs(), 1.116))))
         // Built before whenever(): the constructor reads activePlugin, a mock.
@@ -301,6 +303,7 @@ class KeepAliveWorkerTest : TestBaseWithProfile() {
     @Test
     fun `checkPump still reads the status when the pump gives another rate than the running profile`() = runTest {
         worker = createWorker()
+        stubRunningMode(RM.Mode.OPEN_LOOP)
         whenever(loop.runningMode()).thenReturn(RM.Mode.OPEN_LOOP)
         whenever(profileFunction.getRequestedProfile()).thenReturn(profileSwitch.copy(id = 140))
         val running = ProfileSealed.EPS(effectiveProfileSwitch.copy(originalPsId = 140, basalBlocks = listOf(Block(T.hours(24).msecs(), 1.10))), activePlugin)

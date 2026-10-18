@@ -226,7 +226,7 @@ class TreatmentViewModel(
 
         val wizard = entry.doCalc(profile!!, profileName, lastBG!!)
         if (wizard.calculatedTotalInsulin <= 0.0)
-            return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, disabledReason = rh.gs(UiStrings.wizard_no_insulin_required))
+            return QuickWizardItem(guid = guid, buttonText = buttonText, mode = entry.mode().value, disabledReason = rh.gs(CoreUiStrings.wizard_no_insulin_required))
 
         val detail = rh.gs(InterfacesStrings.format_carbs, entry.carbs()) +
             " " + rh.gs(InterfacesStrings.format_insulin_units, wizard.calculatedTotalInsulin)
