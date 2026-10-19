@@ -43,6 +43,7 @@ import app.aaps.core.interfaces.overview.graph.BolusType
 import app.aaps.core.interfaces.overview.graph.ChartSmbMarker
 import app.aaps.core.interfaces.overview.graph.ChartTbrSegment
 import app.aaps.core.interfaces.overview.graph.EpsGraphPoint
+import app.aaps.core.interfaces.overview.graph.GraphDataPoint
 import app.aaps.core.interfaces.overview.graph.SeriesType
 import app.aaps.core.interfaces.overview.graph.TargetLineData
 import app.aaps.core.interfaces.overview.graph.TreatmentGraphData
@@ -90,6 +91,8 @@ import kotlinx.coroutines.delay
 private const val showBasalOnBgGraph = false
 /** Series identifiers */
 
+/** The IOB line on the BG graph shows IOB times this factor: 2 U is drawn at 20 mg/dl. */
+private const val IOB_CHART_FACTOR = 10.0
 private const val SERIES_REGULAR = "regular"
 private const val SERIES_BUCKETED = "bucketed"
 private const val SERIES_PRED_IOB = "pred_iob"
@@ -217,6 +220,9 @@ fun BgGraphCompose(
     val epsPoints by viewModel.epsGraphFlow.collectAsStateWithLifecycle()
     val showActivityOnMainChart = SeriesType.ACTIVITY in bgOverlays && !dashboardSplitActivityToStrip
     val activityData by viewModel.activityGraphFlow.collectAsStateWithLifecycle()
+    val showIob = SeriesType.IOB in bgOverlays
+    val rawIobData by viewModel.iobGraphFlow.collectAsStateWithLifecycle()
+    val iobData = if (showIob) rawIobData.iob else emptyList()
     val showBolus = SeriesType.BOLUS in bgOverlays
     val treatmentData by viewModel.treatmentGraphFlow.collectAsStateWithLifecycle()
     val smbColor = AapsTheme.elementColors.smbMarker
@@ -323,6 +329,7 @@ fun BgGraphCompose(
         currentEpsPoints: List<EpsGraphPoint>,
         currentActivityData: ActivityGraphData,
         currentActivityScale: ActivityOverlayScale,
+        currentIobData: List<GraphDataPoint>,
         currentMinBgY: Double,
         currentMaxBgY: Double,
         currentTreatmentData: TreatmentGraphData,
@@ -470,24 +477,35 @@ fun BgGraphCompose(
             // a natural horizontal reference, with the room between it and the BG axis floor left
             // for the rare negative excursion. Scale comes from the visible window only — see
             // activityOverlayScale and the LaunchedEffect below.
+            // The IOB line shares this layer as its third series (history, prediction, IOB).
             lineModel {
                 if (!showActivityOnMainChart || currentActivityScale.scale <= 0.0 || currentActivityData.activity.size < 2) {
                     // Activity disabled or no data — emit dummy series (history + prediction)
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
-                    return@lineModel
-                }
-
-                val pts = currentActivityData.activity
-                    .map { timestampToX(it.timestamp, minTimestamp) to currentActivityScale.map(it.value) }
-                    .sortedBy { it.first }
-                series(x = pts.map { it.first }, y = pts.map { it.second })
-
-                if (currentActivityData.activityPrediction.size >= 2) {
-                    val predPts = currentActivityData.activityPrediction
+                } else {
+                    val pts = currentActivityData.activity
                         .map { timestampToX(it.timestamp, minTimestamp) to currentActivityScale.map(it.value) }
                         .sortedBy { it.first }
-                    series(x = predPts.map { it.first }, y = predPts.map { it.second })
+                    series(x = pts.map { it.first }, y = pts.map { it.second })
+
+                    if (currentActivityData.activityPrediction.size >= 2) {
+                        val predPts = currentActivityData.activityPrediction
+                            .map { timestampToX(it.timestamp, minTimestamp) to currentActivityScale.map(it.value) }
+                            .sortedBy { it.first }
+                        series(x = predPts.map { it.first }, y = predPts.map { it.second })
+                    } else {
+                        series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
+                    }
+                }
+
+                // IOB × 10 (2 U is drawn at 20 mg/dl). Capped at the top of the BG axis so a high IOB
+                // never stretches the BG scale.
+                val iobPts = currentIobData
+                    .map { timestampToX(it.timestamp, minTimestamp) to minOf(viewModel.glucoseMgdlToChartY(it.value * IOB_CHART_FACTOR), currentMaxBgY) }
+                    .sortedBy { it.first }
+                if (iobPts.size >= 2) {
+                    series(x = iobPts.map { it.first }, y = iobPts.map { it.second })
                 } else {
                     series(x = listOf(0.0, 1.0), y = listOf(0.0, 0.0))
                 }
@@ -545,6 +563,7 @@ fun BgGraphCompose(
         epsPoints,
         activityData,
         showActivityOnMainChart,
+        iobData,
         chartConfig,
         generalUnits,
         stableTimeRange,
@@ -608,7 +627,7 @@ fun BgGraphCompose(
             roomBelow = chartConfig.lowMark - minBgY
         )
 
-        rebuildChart(basalData, targetData, epsPoints, activityData, activityScale, minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
+        rebuildChart(basalData, targetData, epsPoints, activityData, activityScale, iobData, minBgY, maxBgY, treatmentData, showBolus, chartConfig.lowMark, chartConfig.highMark)
     }
 
     // Time formatter and axis configuration
@@ -882,8 +901,20 @@ fun BgGraphCompose(
         )
     }
 
-    val activityLines = remember(activityHistLine, activityPredLine) {
-        listOf(activityHistLine, activityPredLine)
+    // IOB × 10: same colour and step shape as the IOB sub graph, but a plain line without area fill,
+    // so it does not hide the BG points.
+    val iobColor = AapsTheme.generalColors.iobChart
+    val iobLine = remember(iobColor) {
+        LineCartesianLayer.Line(
+            fill = LineCartesianLayer.LineFill.single(Fill(iobColor)),
+            stroke = LineCartesianLayer.LineStroke.Continuous(thickness = 1.5.dp),
+            areaFill = null,
+            interpolator = Square
+        )
+    }
+
+    val activityLines = remember(activityHistLine, activityPredLine, iobLine) {
+        listOf(activityHistLine, activityPredLine, iobLine)
     }
 
     // Outline keeps the marker readable on top of the basal wash and the BG curve.

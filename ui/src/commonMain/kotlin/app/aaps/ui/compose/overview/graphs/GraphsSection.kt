@@ -239,7 +239,7 @@ private val PREDICTION_SPOKEN_ORDER = listOf(
 )
 
 /** Series types available as BG graph overlays */
-private val BG_OVERLAY_SERIES = listOf(SeriesType.ACTIVITY, SeriesType.PREDICTIONS, SeriesType.BOLUS, SeriesType.BASAL )
+private val BG_OVERLAY_SERIES = listOf(SeriesType.ACTIVITY, SeriesType.PREDICTIONS, SeriesType.BOLUS, SeriesType.BASAL, SeriesType.IOB)
 
 /** AutoISF-specific series — only shown in the picker when AutoISF is the active APS plugin */
 private val AUTOISF_SERIES = setOf(
@@ -1569,7 +1569,11 @@ private fun GraphSeriesBottomSheet(
                     FilterChip(
                         selected = type in selectedSeries,
                         onClick = { onToggle(type) },
-                        label = { Text(stringResource(seriesShortNameId(type))) },
+                        label = {
+                            // IOB is only offered on the BG graph, where it is drawn multiplied by 10
+                            val labelId = if (type == SeriesType.IOB) CoreUiStrings.iob_x10_shortname else seriesShortNameId(type)
+                            Text(stringResource(labelId))
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer

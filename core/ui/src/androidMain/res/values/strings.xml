@@ -1308,6 +1308,7 @@
     <string name="activity_shortname" comment="Short label for Activity graph series">ACT</string>
     <string name="bgi_shortname" comment="Short label for Blood Glucose Impact graph series">-BGI</string>
     <string name="abs_insulin_shortname" comment="Short label for Absolute Insulin graph series">ABS</string>
+    <string name="iob_x10_shortname" comment="Chip label for the IOB line on the BG graph. The line shows IOB multiplied by 10 (2 U is drawn at 20). Example: IOB ×10">IOB ×10</string>
     <string name="devslope_shortname" comment="Short label for Deviation Slope graph series">DEVSLOPE</string>
     <string name="heartRate_shortname" comment="Short label for Heart Rate graph series">HR</string>
     <string name="sensitivity_shortname" comment="Short label for Sensitivity/Autosens graph series">SENS%</string>
