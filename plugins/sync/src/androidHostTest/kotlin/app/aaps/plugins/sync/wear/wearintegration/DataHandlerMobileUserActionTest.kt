@@ -1,5 +1,6 @@
 package app.aaps.plugins.sync.wear.wearintegration
 
+import org.mockito.kotlin.mock
 import app.aaps.core.data.model.RM
 import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.automation.Automation

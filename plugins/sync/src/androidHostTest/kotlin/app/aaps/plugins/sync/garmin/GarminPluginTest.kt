@@ -511,6 +511,15 @@ class GarminPluginTest : TestBaseWithProfile() {
         verify(loopHub, times(0)).postTempTarget(any(), any())
     }
 
+    /** "coffee": the loop meets the rise with a bounded basal, not with SMBs (CoffeeRiseMode). No temp target. */
+    @Test
+    fun testOnPostMode_CoffeeDefaultDuration() {
+        val uri = createUri(mapOf("mode" to "Coffee"))
+        assertEquals("""{"ok":true,"mode":"coffee","duration":90}""", gp.onPostMode(uri))
+        verify(loopHub).postTherapyMode("coffee", 90)
+        verify(loopHub, times(0)).postTempTarget(any(), any())
+    }
+
     @Test
     fun testOnPostMode_InvalidRejected() {
         val uri = createUri(mapOf("mode" to "hack"))
@@ -575,6 +584,10 @@ class GarminPluginTest : TestBaseWithProfile() {
         )
         verify(loopHub).getGlucoseValues(clock.instant().minusSeconds(25L * 300L), false)
         verify(loopHub).glucoseUnit
+        // onSgv also reads the target, the active mode and the TBR minutes left (target/mode/tbrMins fields).
+        verify(loopHub, atLeastOnce()).currentTargetMgdl
+        verify(loopHub, atLeastOnce()).activeTherapyMode
+        verify(loopHub, atLeastOnce()).temporaryBasalRemainingMinutes
     }
 
     @Test
@@ -620,6 +633,10 @@ class GarminPluginTest : TestBaseWithProfile() {
         )
 
         verify(loopHub, atLeastOnce()).glucoseUnit
+        // onSgv also reads the target, the active mode and the TBR minutes left (target/mode/tbrMins fields).
+        verify(loopHub, atLeastOnce()).currentTargetMgdl
+        verify(loopHub, atLeastOnce()).activeTherapyMode
+        verify(loopHub, atLeastOnce()).temporaryBasalRemainingMinutes
     }
 
     @Test
@@ -645,6 +662,12 @@ class GarminPluginTest : TestBaseWithProfile() {
                 json.contains("\"tbrMins\":27"),
             "missing target/mode/tbrMins in: $json"
         )
+        verify(loopHub).getGlucoseValues(any(), eq(false))
+        verify(loopHub, atLeastOnce()).glucoseUnit
+        // onSgv also reads the target, the active mode and the TBR minutes left (target/mode/tbrMins fields).
+        verify(loopHub, atLeastOnce()).currentTargetMgdl
+        verify(loopHub, atLeastOnce()).activeTherapyMode
+        verify(loopHub, atLeastOnce()).temporaryBasalRemainingMinutes
     }
 
 }

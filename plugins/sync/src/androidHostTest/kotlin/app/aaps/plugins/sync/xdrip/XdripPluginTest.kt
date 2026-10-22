@@ -1,5 +1,6 @@
 package app.aaps.plugins.sync.xdrip
 
+import org.mockito.kotlin.mock
 import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.glucose.GlucoseCorrection
