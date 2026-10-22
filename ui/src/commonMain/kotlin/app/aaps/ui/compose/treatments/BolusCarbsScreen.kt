@@ -49,10 +49,10 @@ import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.LocalDateUtil
 import app.aaps.core.ui.compose.ToolbarConfig
-import app.aaps.core.ui.compose.dialogs.OkCancelDialog
 import app.aaps.core.ui.compose.glass.GlassCard
 import app.aaps.core.ui.compose.glass.GlassColors
 import app.aaps.core.ui.compose.glass.isGlassDarkMode
+import app.aaps.core.ui.compose.dialogs.RecordRemovalDialog
 import app.aaps.core.ui.compose.icons.Ns
 import app.aaps.core.ui.compose.icons.Pump
 import app.aaps.core.ui.compose.navigation.color
@@ -79,8 +79,6 @@ fun BolusCarbsScreen(
     val isDark = isGlassDarkMode()
 
     // Dialog state
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var deleteDialogMessage by remember { mutableStateOf("") }
     var showInfoBcr by remember { mutableStateOf<BCR?>(null) }
 
     val profile by produceState<Profile?>(null, uiState.mealLinks) { value = viewModel.getProfile() }
@@ -90,12 +88,7 @@ fun BolusCarbsScreen(
         setToolbarConfig(
             viewModel.getToolbarConfig(
                 onNavigateBack = onNavigateBack,
-                onDeleteClick = {
-                    if (uiState.selectedItems.isNotEmpty()) {
-                        deleteDialogMessage = viewModel.getDeleteConfirmationMessage()
-                        showDeleteDialog = true
-                    }
-                }
+                onDeleteClick = { viewModel.requestDelete() }
             )
         )
     }
@@ -109,18 +102,8 @@ fun BolusCarbsScreen(
         )
     }
 
-    // Delete confirmation dialog
-    if (showDeleteDialog) {
-        OkCancelDialog(
-            title = stringResource(CoreUiStrings.removerecord),
-            message = deleteDialogMessage,
-            onConfirm = {
-                viewModel.deleteSelected()
-                showDeleteDialog = false
-            },
-            onDismiss = { showDeleteDialog = false }
-        )
-    }
+    // Delete confirmation, written by the master
+    RecordRemovalDialog(removal = viewModel.removal, onApplied = { viewModel.onRemoved() })
 
     AapsTheme {
         Box(modifier = Modifier.fillMaxSize()) {

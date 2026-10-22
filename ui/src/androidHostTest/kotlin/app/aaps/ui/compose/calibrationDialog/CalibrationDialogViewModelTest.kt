@@ -1,31 +1,34 @@
 package app.aaps.ui.compose.calibrationDialog
 
-import app.aaps.core.data.configuration.Constants
+import app.aaps.core.data.model.CAL
 import app.aaps.core.data.model.GlucoseUnit
-import app.aaps.core.interfaces.InterfacesStrings
-import app.aaps.core.interfaces.aps.GlucoseStatus
+import app.aaps.core.data.model.TE
+import app.aaps.core.data.ue.Sources
+import app.aaps.core.data.ui.ConfirmationLine
+import app.aaps.core.data.ui.ConfirmationRole
+import app.aaps.core.interfaces.bolus.BatchAction
+import app.aaps.core.interfaces.bolus.BatchExecutor
 import app.aaps.core.interfaces.calibration.AddEntryResult
 import app.aaps.core.interfaces.calibration.Calibration
 import app.aaps.core.interfaces.calibration.CalibrationStatus
+import app.aaps.core.interfaces.clientcontrol.ActionProgress
+import app.aaps.core.interfaces.clientcontrol.FailureReason
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
-import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.plugin.ActivePlugin
-import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
-import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.source.BgSource
-import app.aaps.core.interfaces.source.SensorCalibrationResult
-import app.aaps.core.interfaces.source.XDripSource
-import app.aaps.core.interfaces.sync.XDripBroadcast
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
-import app.aaps.core.ui.CoreUiStrings
-import app.aaps.ui.UiStrings
+import app.aaps.shared.tests.generatedTextResolver
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -37,59 +40,51 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
-import org.mockito.kotlin.anyVararg
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
-import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
+/**
+ * The calibration dialog only shows what the master decides: it sends the fingerstick value, renders the master's
+ * confirmation, and commits it. Storing the calibration on this device is the master's job (see `MasterRecordWriter`).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class CalibrationDialogViewModelTest {
 
     @Mock private lateinit var profileUtil: ProfileUtil
-    @Mock private lateinit var profileFunction: ProfileFunction
-    @Mock private lateinit var xDripBroadcast: XDripBroadcast
-    @Mock private lateinit var xDripSource: XDripSource
-    @Mock private lateinit var uel: UserEntryLogger
     @Mock private lateinit var glucoseStatusProvider: GlucoseStatusProvider
     @Mock private lateinit var activePlugin: ActivePlugin
-    @Mock private lateinit var activeCalibration: Calibration
     @Mock private lateinit var persistenceLayer: PersistenceLayer
     @Mock private lateinit var dateUtil: DateUtil
-    @Mock private lateinit var rh: ResourceHelper
     @Mock private lateinit var decimalFormatter: DecimalFormatter
+    @Mock private lateinit var batchExecutor: BatchExecutor
+    @Mock private lateinit var config: Config
+    @Mock private lateinit var calibration: Calibration
+    @Mock private lateinit var bgSource: BgSource
 
+    private lateinit var dispatcher: TestDispatcher
     private lateinit var sut: CalibrationDialogViewModel
 
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
         // refreshPreconditions() is launched on viewModelScope -> deferred by StandardTestDispatcher.
-        Dispatchers.setMain(StandardTestDispatcher())
+        dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
         whenever(profileUtil.units).thenReturn(GlucoseUnit.MGDL)
         whenever(profileUtil.fromMgdlToUnits(any(), any())).thenReturn(0.0)
-        whenever(activePlugin.activeCalibration).thenReturn(activeCalibration)
-        // confirmAndSave() asks the active source whether it keeps its own calibration before it
-        // stores anything, so the dialog needs a source here. A plain one answers false and the
-        // entry is stored in the app, which is what these tests are about; the tests for sources
-        // that calibrate in the sensor stub their own.
-        val bgSource = mock<BgSource>()
-        whenever(bgSource.calibratesInSensor()).thenReturn(false)
+        whenever(profileUtil.convertToMgdl(any(), any())).thenAnswer { it.getArgument<Double>(0) }
+        whenever(persistenceLayer.observeChanges(TE::class)).thenReturn(emptyFlow())
+        whenever(persistenceLayer.observeChanges(CAL::class)).thenReturn(emptyFlow())
+        whenever(activePlugin.activeCalibration).thenReturn(calibration)
         whenever(activePlugin.activeBgSource).thenReturn(bgSource)
-        // The summary and the post-save message are built from named string refs now. An unstubbed
-        // call hands back null, and the line builder rejects a null text.
-        // `anyVararg()` for the `vararg args` of `gs`, not one `any()` per argument: Mockito sees the
-        // whole vararg array as a single argument, so two separate `any()` calls register matchers
-        // for arguments that the call site never passes. The stub then never matches and the mock
-        // answers null - which is what the line builder above refuses.
-        whenever(rh.gs(eq(CoreUiStrings.bg_label))).thenReturn("BG")
-        whenever(rh.gs(eq(CoreUiStrings.value_with_unit), anyVararg())).thenReturn("120 mg/dl")
-        whenever(rh.gs(eq(InterfacesStrings.confirmation_line), anyVararg())).thenReturn("BG: 120 mg/dl")
-        whenever(rh.gs(eq(UiStrings.cal_saved_need_more_entries), anyVararg())).thenReturn("one more entry needed")
+        whenever(bgSource.calibratesInSensor()).thenReturn(false)
+        runBlocking { whenever(calibration.status()).thenReturn(CalibrationStatus.Applied) }
+        runBlocking { whenever(calibration.checkPreconditions()).thenReturn(AddEntryResult.Accepted) }
         sut = CalibrationDialogViewModel(
-            profileUtil, profileFunction, xDripBroadcast, xDripSource, uel, glucoseStatusProvider,
-            activePlugin, persistenceLayer, dateUtil, rh, decimalFormatter
+            profileUtil, glucoseStatusProvider, activePlugin, persistenceLayer, dateUtil, generatedTextResolver(), decimalFormatter, batchExecutor, config
         )
     }
 
@@ -111,202 +106,116 @@ internal class CalibrationDialogViewModelTest {
     }
 
     @Test
-    fun `confirmAndSave on an accepted first entry tells the user it did not apply yet`() = runTest {
-        whenever(activeCalibration.addEntry(any(), any())).thenReturn(AddEntryResult.Accepted)
-        whenever(activeCalibration.status()).thenReturn(CalibrationStatus.NeedMoreEntries(1))
-
+    fun `the calibration goes to the master and its confirmation is shown`() = runTest(dispatcher) {
+        val lines = listOf(ConfirmationLine(ConfirmationRole.PRIMARY, "Calibration: 120 mg/dl"))
+        whenever(batchExecutor.prepare(any(), eq(Sources.CalibrationDialog), any())).thenReturn(ActionProgress.Prepared(7L, lines))
         sut.updateBg(120.0)
-        sut.buildConfirmationSummary()
-        sut.confirmAndSave()
+
+        sut.requestCalibration()
         advanceUntilIdle()
+
+        val actions = argumentCaptor<List<BatchAction>>()
+        verify(batchExecutor).prepare(actions.capture(), eq(Sources.CalibrationDialog), any())
+        assertThat(actions.firstValue).containsExactly(BatchAction.Calibration(120.0))
+        assertThat(sut.confirmation.value).isEqualTo(CalibrationDialogViewModel.Confirmation(7L, lines))
+    }
+
+    @Test
+    fun `confirming commits the master's prepared calibration and closes the dialog`() = runTest(dispatcher) {
+        whenever(batchExecutor.prepare(any(), any(), any())).thenReturn(ActionProgress.Prepared(7L, emptyList()))
+        whenever(batchExecutor.commit(eq(7L), eq(Sources.CalibrationDialog), any(), any())).thenReturn(ActionProgress.Applied)
+        sut.updateBg(120.0)
+        sut.requestCalibration()
+        advanceUntilIdle()
+
+        sut.confirmCalibration()
+        advanceUntilIdle()
+
+        verify(batchExecutor).commit(eq(7L), eq(Sources.CalibrationDialog), any(), any())
+        assertThat(sut.confirmation.value).isNull()
+        assertThat(sut.sideEffect.replayCache).containsExactly(CalibrationDialogViewModel.SideEffect.EntryAccepted(null))
+    }
+
+    private suspend fun commitAcceptedCalibration() {
+        whenever(batchExecutor.prepare(any(), any(), any())).thenReturn(ActionProgress.Prepared(7L, emptyList()))
+        whenever(batchExecutor.commit(eq(7L), eq(Sources.CalibrationDialog), any(), any())).thenReturn(ActionProgress.Applied)
+        sut.updateBg(120.0)
+        sut.requestCalibration()
+        dispatcher.scheduler.advanceUntilIdle()
+        sut.confirmCalibration()
+        dispatcher.scheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `an accepted first entry tells the user it did not apply yet`() = runTest(dispatcher) {
+        whenever(calibration.status()).thenReturn(CalibrationStatus.NeedMoreEntries(1))
+
+        commitAcceptedCalibration()
 
         val effect = sut.sideEffect.replayCache.last() as CalibrationDialogViewModel.SideEffect.EntryAccepted
-        assertThat(effect.message).isEqualTo("one more entry needed")
+        assertThat(effect.message).isNotNull()
     }
 
     @Test
-    fun `confirmAndSave on an accepted entry that already applies has no message`() = runTest {
-        whenever(activeCalibration.addEntry(any(), any())).thenReturn(AddEntryResult.Accepted)
-        whenever(activeCalibration.status()).thenReturn(CalibrationStatus.Applied)
+    fun `a value sent to the sensor tells the user to check the sensor`() = runTest(dispatcher) {
+        whenever(bgSource.calibratesInSensor()).thenReturn(true)
 
-        sut.updateBg(120.0)
-        sut.buildConfirmationSummary()
-        sut.confirmAndSave()
-        advanceUntilIdle()
+        commitAcceptedCalibration()
 
         val effect = sut.sideEffect.replayCache.last() as CalibrationDialogViewModel.SideEffect.EntryAccepted
-        assertThat(effect.message).isNull()
-    }
-
-    // ----- large gap between the entered blood value and the sensor value -----
-
-    /**
-     * Builds a view model for a mg/dL profile with a known last sensor reading. In mg/dL the
-     * display value and the mg/dL value are the same number, so the conversions are identities.
-     */
-    private fun viewModelWithSensorMgdl(sensorMgdl: Double): CalibrationDialogViewModel {
-        val status = mock<GlucoseStatus>()
-        whenever(status.glucose).thenReturn(sensorMgdl)
-        whenever(glucoseStatusProvider.glucoseStatusData).thenReturn(status)
-        whenever(profileUtil.fromMgdlToUnits(any(), any())).thenAnswer { it.getArgument<Double>(0) }
-        whenever(profileUtil.convertToMgdl(any(), any())).thenAnswer { it.getArgument<Double>(0) }
-        return CalibrationDialogViewModel(
-            profileUtil, profileFunction, xDripBroadcast, xDripSource, uel, glucoseStatusProvider,
-            activePlugin, persistenceLayer, dateUtil, rh, decimalFormatter
-        )
+        assertThat(effect.message).isNotNull()
     }
 
     @Test
-    fun `warns when blood 209 is entered against a sensor reading of 309`() {
-        val viewModel = viewModelWithSensorMgdl(309.0)
+    fun `a client says nothing about the sensor of the master`() = runTest(dispatcher) {
+        whenever(config.AAPSCLIENT).thenReturn(true)
+        whenever(bgSource.calibratesInSensor()).thenReturn(true)
 
-        viewModel.updateBg(209.0)
+        commitAcceptedCalibration()
 
-        val warning = viewModel.uiState.value.gapWarning
-        assertThat(warning).isNotNull()
-        assertThat(warning!!.bloodValue).isEqualTo(209.0)
-        assertThat(warning.sensorValue).isEqualTo(309.0)
-        // The entry can still be saved.
-        assertThat(viewModel.hasAction()).isTrue()
-    }
-
-    @Test
-    fun `does not warn on a small gap`() {
-        val viewModel = viewModelWithSensorMgdl(100.0)
-
-        viewModel.updateBg(90.0)
-
-        assertThat(viewModel.uiState.value.gapWarning).isNull()
-    }
-
-    @Test
-    fun `warns exactly at the 25 percent boundary and not just below it`() {
-        val atBoundary = viewModelWithSensorMgdl(100.0)
-        atBoundary.updateBg(75.0) // gap 25 mg/dL = 25 percent of 100, and below the 50 mg/dL rule
-        assertThat(atBoundary.uiState.value.gapWarning).isNotNull()
-
-        val belowBoundary = viewModelWithSensorMgdl(100.0)
-        belowBoundary.updateBg(76.0) // gap 24 mg/dL = 24 percent of 100
-        assertThat(belowBoundary.uiState.value.gapWarning).isNull()
-    }
-
-    @Test
-    fun `warns exactly at the 50 mgdl boundary and not just below it`() {
-        val atBoundary = viewModelWithSensorMgdl(400.0)
-        atBoundary.updateBg(350.0) // gap 50 mg/dL, only 12,5 percent of 400
-        assertThat(atBoundary.uiState.value.gapWarning).isNotNull()
-
-        val belowBoundary = viewModelWithSensorMgdl(400.0)
-        belowBoundary.updateBg(351.0) // gap 49 mg/dL, about 12 percent of 400
-        assertThat(belowBoundary.uiState.value.gapWarning).isNull()
-    }
-
-    @Test
-    fun `does not warn when no sensor reading is known`() {
-        val viewModel = viewModelWithSensorMgdl(0.0)
-
-        viewModel.updateBg(209.0)
-
-        assertThat(viewModel.uiState.value.gapWarning).isNull()
-    }
-    // ----- sources that hand the value to the sensor itself -----
-
-    /**
-     * Makes the active source one that keeps its calibration in the sensor. The mg/dL conversion is
-     * the identity here, so the value entered is also the value sent.
-     */
-    private fun sensorSource(result: SensorCalibrationResult): BgSource {
-        val source = mock<BgSource>()
-        whenever(source.calibratesInSensor()).thenReturn(true)
-        whenever(source.calibrateSensor(any(), any())).thenReturn(result)
-        whenever(activePlugin.activeBgSource).thenReturn(source)
-        whenever(profileUtil.convertToMgdl(any(), any())).thenAnswer { it.getArgument<Double>(0) }
-        return source
-    }
-
-    /**
-     * The summary is built from string templates, so they must answer before confirmAndSave().
-     * The arguments can be null here, so they are matched with anyOrNull().
-     */
-    private fun stubConfirmationStrings() {
-        whenever(rh.gs(eq(CoreUiStrings.value_with_unit), anyOrNull(), anyOrNull())).thenReturn("120 mg/dl")
-        whenever(rh.gs(eq(InterfacesStrings.confirmation_line), anyOrNull(), anyOrNull())).thenReturn("BG: 120 mg/dl")
-    }
-
-    @Test
-    fun `value queued in the sensor stores no entry in the app`() = runTest {
-        val source = sensorSource(SensorCalibrationResult.Queued)
-        stubConfirmationStrings()
-        whenever(rh.gs(UiStrings.cal_sent_to_sensor)).thenReturn("sent to the sensor")
-
-        sut.updateBg(120.0)
-        sut.buildConfirmationSummary()
-        sut.confirmAndSave()
-        advanceUntilIdle()
-
-        verify(source).calibrateSensor(eq(120), any())
-        // Never both: the sensor re-bases itself, a line fitted here would correct it twice.
-        verify(activeCalibration, never()).addEntry(any(), any())
-        val effect = sut.sideEffect.replayCache.last() as CalibrationDialogViewModel.SideEffect.EntryAccepted
-        assertThat(effect.message).isEqualTo("sent to the sensor")
-    }
-
-    @Test
-    fun `value refused by the sensor stores no entry and shows the reason`() = runTest {
-        sensorSource(SensorCalibrationResult.Refused("no session"))
-        stubConfirmationStrings()
-
-        sut.updateBg(120.0)
-        sut.buildConfirmationSummary()
-        sut.confirmAndSave()
-        advanceUntilIdle()
-
-        verify(activeCalibration, never()).addEntry(any(), any())
-        val effect = sut.sideEffect.replayCache.last() as CalibrationDialogViewModel.SideEffect.EntryRejected
-        assertThat(effect.message).isEqualTo("no session")
-    }
-
-    @Test
-    fun `entry is still stored in the app when the source does not calibrate in the sensor`() = runTest {
-        val source = mock<BgSource>()
-        whenever(source.calibratesInSensor()).thenReturn(false)
-        whenever(activePlugin.activeBgSource).thenReturn(source)
-        whenever(profileUtil.convertToMgdl(any(), any())).thenAnswer { it.getArgument<Double>(0) }
-        whenever(activeCalibration.addEntry(any(), any())).thenReturn(AddEntryResult.Accepted)
-        whenever(activeCalibration.status()).thenReturn(CalibrationStatus.Applied)
-        stubConfirmationStrings()
-
-        sut.updateBg(120.0)
-        sut.buildConfirmationSummary()
-        sut.confirmAndSave()
-        advanceUntilIdle()
-
-        verify(activeCalibration).addEntry(eq(120.0), any())
-        verify(source, never()).calibrateSensor(any(), any())
         val effect = sut.sideEffect.replayCache.last() as CalibrationDialogViewModel.SideEffect.EntryAccepted
         assertThat(effect.message).isNull()
     }
 
     @Test
-    fun `mmol value is sent to the sensor as a rounded mgdl value`() = runTest {
-        val source = mock<BgSource>()
-        whenever(source.calibratesInSensor()).thenReturn(true)
-        whenever(source.calibrateSensor(any(), any())).thenReturn(SensorCalibrationResult.Queued)
-        whenever(activePlugin.activeBgSource).thenReturn(source)
-        whenever(profileUtil.units).thenReturn(GlucoseUnit.MMOL)
-        whenever(profileUtil.convertToMgdl(any(), any())).thenAnswer { it.getArgument<Double>(0) * Constants.MMOLL_TO_MGDL }
-        stubConfirmationStrings()
-        whenever(rh.gs(UiStrings.cal_sent_to_sensor)).thenReturn("sent to the sensor")
-        val viewModel = CalibrationDialogViewModel(
-            profileUtil, profileFunction, xDripBroadcast, xDripSource, uel, glucoseStatusProvider,
-            activePlugin, persistenceLayer, dateUtil, rh, decimalFormatter
-        )
+    fun `a refusal from the master is shown on the master`() = runTest(dispatcher) {
+        whenever(config.AAPSCLIENT).thenReturn(false)
+        whenever(batchExecutor.prepare(any(), any(), any())).thenReturn(ActionProgress.Rejected(FailureReason.ExecutionFailed, "BG is changing too fast"))
+        sut.updateBg(120.0)
 
-        viewModel.updateBg(5.6) // 5.6 mmol/L is 100.9 mg/dL
-        viewModel.buildConfirmationSummary()
-        viewModel.confirmAndSave()
+        sut.requestCalibration()
         advanceUntilIdle()
 
-        verify(source).calibrateSensor(eq(101), any())
+        assertThat(sut.confirmation.value).isNull()
+        assertThat(sut.sideEffect.replayCache).containsExactly(CalibrationDialogViewModel.SideEffect.EntryRejected("BG is changing too fast"))
+    }
+
+    @Test
+    fun `cancelling the confirmation commits nothing`() = runTest(dispatcher) {
+        whenever(batchExecutor.prepare(any(), any(), any())).thenReturn(ActionProgress.Prepared(7L, emptyList()))
+        sut.updateBg(120.0)
+        sut.requestCalibration()
+        advanceUntilIdle()
+
+        sut.dismissCalibration()
+        sut.confirmCalibration()
+        advanceUntilIdle()
+
+        verify(batchExecutor, never()).commit(any(), any(), any(), anyOrNull())
+    }
+
+    @Test
+    fun `a sensor change goes to the master as a therapy event`() = runTest(dispatcher) {
+        whenever(dateUtil.now()).thenReturn(1_000L)
+        whenever(batchExecutor.prepare(any(), eq(Sources.SensorInsert), any())).thenReturn(ActionProgress.Prepared(9L, emptyList()))
+        whenever(batchExecutor.commit(eq(9L), eq(Sources.SensorInsert), any(), any())).thenReturn(ActionProgress.Applied)
+
+        sut.markSensorChangeNow()
+        advanceUntilIdle()
+
+        val actions = argumentCaptor<List<BatchAction>>()
+        verify(batchExecutor).prepare(actions.capture(), eq(Sources.SensorInsert), any())
+        assertThat(actions.firstValue).containsExactly(BatchAction.TherapyEvent(teType = TE.Type.SENSOR_CHANGE, timestamp = 1_000L, source = Sources.SensorInsert))
+        verify(batchExecutor).commit(eq(9L), eq(Sources.SensorInsert), any(), any())
     }
 }

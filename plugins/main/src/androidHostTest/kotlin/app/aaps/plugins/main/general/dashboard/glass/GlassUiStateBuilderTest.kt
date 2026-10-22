@@ -35,7 +35,7 @@ class GlassUiStateBuilderTest {
     )
 
     private fun treatmentData(boluses: List<BolusGraphPoint> = emptyList(), carbs: List<CarbsGraphPoint> = emptyList()) =
-        TreatmentGraphData(boluses = boluses, carbs = carbs, extendedBoluses = emptyList(), therapyEvents = emptyList())
+        TreatmentGraphData(boluses = boluses, carbs = carbs, extendedBoluses = emptyList(), therapyEvents = emptyList(), calibrations = emptyList())
 
     @Test
     fun `most recent valid bolus label is used, invalid and older ones are ignored`() {

@@ -12,6 +12,7 @@ import app.aaps.core.interfaces.aps.GlucoseStatusSMB
 import app.aaps.core.interfaces.calibration.AddEntryResult
 import app.aaps.core.interfaces.calibration.CalibrationContext
 import app.aaps.core.interfaces.calibration.CalibrationStatus
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.notifications.NotificationAction
@@ -48,6 +49,7 @@ class LinearCalibrationPluginTest : TestBase() {
     @Mock lateinit var glucoseStatusProvider: GlucoseStatusProvider
     @Mock lateinit var preferences: Preferences
     @Mock lateinit var profileUtil: ProfileUtil
+    @Mock lateinit var config: Config
 
     private lateinit var plugin: LinearCalibrationPlugin
 
@@ -68,7 +70,7 @@ class LinearCalibrationPluginTest : TestBase() {
         whenever(preferences.get(CalibrationLongKey.IgnoredSensorGapAt)).thenReturn(0L)
         plugin = LinearCalibrationPlugin(
             aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus,
-            preferences = preferences, profileUtil = profileUtil
+            preferences = preferences, profileUtil = profileUtil, config = config
         )
     }
 
@@ -221,6 +223,27 @@ class LinearCalibrationPluginTest : TestBase() {
         )
     }
 
+    // The notice's button writes a sensor change. On a client it would stay there, so only the master asks.
+    @Test
+    fun calibrate_gapOnClient_postsNoNotification() = runTest {
+        whenever(config.AAPSCLIENT).thenReturn(true)
+        val data = mutableListOf(
+            value(now, 150.0),
+            value(now - T.mins(60).msecs(), 150.0),
+            value(now - T.mins(65).msecs(), 150.0)
+        )
+        plugin.calibrate(data, CalibrationContext.NONE)
+        verify(notificationManager, never()).post(
+            eq(NotificationId.SENSOR_CHANGE_DETECTED),
+            any<String>(),
+            any<NotificationLevel>(),
+            any<Int>(),
+            anyOrNull(),
+            any<List<NotificationAction>>(),
+            anyOrNull()
+        )
+    }
+
     @Test
     fun calibrate_bucketedDataOnly_neverDetectsGap() = runTest {
         // Guards the whole point of the fix: a gap-free reading table means no notification, even
@@ -355,7 +378,7 @@ class LinearCalibrationPluginTest : TestBase() {
         whenever(preferences.get(CalibrationLongKey.IgnoredSensorGapAt)).thenReturn(ignoredAt)
 
         val restarted = LinearCalibrationPlugin(
-            aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus, preferences, profileUtil
+            aapsLogger, rh, dateUtil, persistenceLayer, notificationManager, glucoseStatusProvider, rxBus, preferences, profileUtil, config
         )
         restarted.calibrate(bucketed(listOf(now to 150.0)), CalibrationContext.NONE)
 

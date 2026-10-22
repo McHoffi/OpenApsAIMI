@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.LocalClientRole
 import app.aaps.core.ui.compose.StatusLevel
 import app.aaps.core.ui.compose.navigation.NavigationRequest
 import app.aaps.core.ui.compose.preference.PreferenceSheetContent
@@ -171,21 +172,23 @@ fun OverviewStatusSection(
                     modifier = bodyGap,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Each button also needs this phone's role to allow what it opens (the master would refuse it).
+                    val role = LocalClientRole.current
                     StatusSectionContent(
                         sensorStatus = sensorStatus,
                         insulinStatus = insulinStatus,
                         cannulaStatus = cannulaStatus,
                         batteryStatus = batteryStatus,
-                        onSensorInsertClick = if (commandsAllowed) {
+                        onSensorInsertClick = if (commandsAllowed && role.allows(ElementType.SENSOR_INSERT.role)) {
                             { onNavigate(NavigationRequest.Element(ElementType.SENSOR_INSERT)) }
                         } else null,
-                        onFillClick = if (showFill && commandsAllowed) {
+                        onFillClick = if (showFill && commandsAllowed && role.allows(ElementType.CANNULA_CHANGE.role)) {
                             { onNavigate(NavigationRequest.Element(ElementType.CANNULA_CHANGE)) }
                         } else null,
-                        onInsulinChangeClick = if (showFill && commandsAllowed) {
+                        onInsulinChangeClick = if (showFill && commandsAllowed && role.allows(ElementType.FILL.role)) {
                             { onNavigate(NavigationRequest.Element(ElementType.FILL)) }
                         } else null,
-                        onBatteryChangeClick = if (showPumpBatteryChange && commandsAllowed) {
+                        onBatteryChangeClick = if (showPumpBatteryChange && commandsAllowed && role.allows(ElementType.BATTERY_CHANGE.role)) {
                             { onNavigate(NavigationRequest.Element(ElementType.BATTERY_CHANGE)) }
                         } else null
                     )

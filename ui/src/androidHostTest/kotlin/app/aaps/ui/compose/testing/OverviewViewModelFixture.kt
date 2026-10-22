@@ -47,6 +47,7 @@ import app.aaps.core.interfaces.sync.NsClient
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
+import app.aaps.core.keys.interfaces.ClientRole
 import app.aaps.core.keys.interfaces.VisibilityContext
 import app.aaps.ui.compose.manageSheet.FakePumpPlugin
 import app.aaps.ui.compose.manageSheet.ManageViewModel
@@ -217,6 +218,9 @@ internal class OverviewViewModelFixture(private val screen: AapsScreenFixture) {
         whenever(persistenceLayer.observeChanges(TB::class)).thenReturn(emptyFlow())
         whenever(persistenceLayer.databaseClearedFlow).thenReturn(emptyFlow())
         whenever(nsClient.masterOrPairedClientFlow).thenReturn(MutableStateFlow(false))
+        // A mock returns null for these, not the interface default; the Manage sheet checks the role of each element.
+        whenever(nsClient.clientRole).thenReturn(MutableStateFlow(ClientRole.Admin))
+        whenever(visibilityContext.clientRole).thenReturn(ClientRole.Admin)
     }
 
     val graphViewModel: GraphViewModel by lazy {

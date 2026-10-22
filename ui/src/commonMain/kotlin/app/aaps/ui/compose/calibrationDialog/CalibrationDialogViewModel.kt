@@ -3,30 +3,29 @@ package app.aaps.ui.compose.calibrationDialog
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.aaps.core.data.model.CAL
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.TE
-import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
-import app.aaps.core.data.ue.ValueWithUnit
 import app.aaps.core.data.ui.ConfirmationLine
-import app.aaps.core.data.ui.ConfirmationRole
-import app.aaps.core.data.ui.confirmationLines
-import app.aaps.core.interfaces.InterfacesStrings
+import app.aaps.core.interfaces.bolus.BatchAction
+import app.aaps.core.interfaces.bolus.BatchExecutor
 import app.aaps.core.interfaces.calibration.AddEntryResult
 import app.aaps.core.interfaces.calibration.CalibrationStatus
+import app.aaps.core.interfaces.clientcontrol.ActionProgress
+import app.aaps.core.interfaces.clientcontrol.FailureReason
+import app.aaps.core.interfaces.clientcontrol.isNotDeliveryError
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.db.observeChanges
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
-import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.plugin.ActivePlugin
-import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.resources.TextResolver
-import app.aaps.core.interfaces.source.SensorCalibrationResult
-import app.aaps.core.interfaces.source.XDripSource
-import app.aaps.core.interfaces.sync.XDripBroadcast
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.clientcontrol.failText
 import app.aaps.ui.UiStrings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
@@ -40,11 +39,19 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
+/**
+ * The calibration dialog. A calibration and a sensor change are stored by the MASTER, on its own sensor data, so
+ * the BG the loop doses on is calibrated: on a client both go over the round trip (see [BatchExecutor]). The master
+ * checks the conditions and writes the confirmation; this screen only shows them.
+ */
 // Registers itself: @ViewModelKey infers the key from the class. No graph entry, and deliberately
 // unscoped so each screen gets its own.
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
@@ -53,16 +60,14 @@ import kotlin.math.roundToInt
 @Inject
 class CalibrationDialogViewModel(
     private val profileUtil: ProfileUtil,
-    @Suppress("unused") private val profileFunction: ProfileFunction,
-    private val xDripBroadcast: XDripBroadcast,
-    private val xDripSource: XDripSource,
-    private val uel: UserEntryLogger,
     private val glucoseStatusProvider: GlucoseStatusProvider,
     private val activePlugin: ActivePlugin,
     private val persistenceLayer: PersistenceLayer,
     private val dateUtil: DateUtil,
     private val rh: TextResolver,
-    private val decimalFormatter: DecimalFormatter
+    private val decimalFormatter: DecimalFormatter,
+    private val batchExecutor: BatchExecutor,
+    private val config: Config
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalibrationDialogUiState())
@@ -89,6 +94,12 @@ class CalibrationDialogViewModel(
     )
     val sideEffect: SharedFlow<SideEffect> = _sideEffect.asSharedFlow()
 
+    /** The master's confirmation of a prepared calibration, waiting for the user's OK. */
+    data class Confirmation(val id: Long, val lines: List<ConfirmationLine>)
+
+    private val _confirmation = MutableStateFlow<Confirmation?>(null)
+    val confirmation: StateFlow<Confirmation?> = _confirmation.asStateFlow()
+
     init {
         val units = profileUtil.units
         val sensorBgMgdl = glucoseStatusProvider.glucoseStatusData?.glucose ?: 0.0
@@ -106,6 +117,10 @@ class CalibrationDialogViewModel(
             )
         }
         refreshPreconditions()
+        // A sensor change or a calibration stored by the master reaches a client through Nightscout a little later.
+        merge(persistenceLayer.observeChanges<TE>().map { }, persistenceLayer.observeChanges<CAL>().map { })
+            .onEach { refreshPreconditions() }
+            .launchIn(viewModelScope)
     }
 
     private fun refreshPreconditions() {
@@ -115,28 +130,20 @@ class CalibrationDialogViewModel(
         }
     }
 
+    /** Store a sensor change now. The button is the user's decision, so there is no confirmation of its own. */
     fun markSensorChangeNow() {
         if (_uiState.value.submitting) return
         _uiState.update { it.copy(submitting = true) }
         viewModelScope.launch {
             try {
-                val timestamp = dateUtil.now()
-                persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
-                    therapyEvent = TE(
-                        timestamp = timestamp,
-                        type = TE.Type.SENSOR_CHANGE,
-                        glucoseUnit = GlucoseUnit.MGDL
-                    ),
-                    action = Action.CAREPORTAL,
-                    source = Sources.SensorInsert,
-                    note = null,
-                    listValues = listOf(
-                        ValueWithUnit.Timestamp(timestamp),
-                        ValueWithUnit.TEType(TE.Type.SENSOR_CHANGE)
-                    )
-                )
-                val result = activePlugin.activeCalibration.checkPreconditions()
-                _uiState.update { it.copy(preconditions = result) }
+                val label = rh.gs(CoreUiStrings.cgm_sensor_insert)
+                val action = BatchAction.TherapyEvent(teType = TE.Type.SENSOR_CHANGE, timestamp = dateUtil.now(), source = Sources.SensorInsert)
+                when (val prepared = batchExecutor.prepare(listOf(action), Sources.SensorInsert, label)) {
+                    is ActionProgress.Prepared -> (batchExecutor.commit(prepared.id, Sources.SensorInsert, label) as? ActionProgress.Rejected)?.let { reject(it) }
+                    is ActionProgress.Rejected -> reject(prepared)
+                    else                       -> Unit
+                }
+                refreshPreconditions()
             } finally {
                 _uiState.update { it.copy(submitting = false) }
             }
@@ -165,48 +172,36 @@ class CalibrationDialogViewModel(
 
     fun hasAction(): Boolean = uiState.value.bg > 0.0
 
-    private var confirmedState: CalibrationDialogUiState? = null
-
-    fun buildConfirmationSummary(): List<ConfirmationLine> {
+    /** Ask the master to check the calibration and describe it. Nothing is stored yet. */
+    fun requestCalibration() {
         val state = uiState.value
-        confirmedState = state
-        val bgText = profileUtil.stringInCurrentUnitsDetect(state.bg)
-        val bgWithUnit = rh.gs(CoreUiStrings.value_with_unit, bgText, state.unitLabel)
-        return confirmationLines {
-            line(ConfirmationRole.PRIMARY, rh.gs(InterfacesStrings.confirmation_line, rh.gs(CoreUiStrings.bg_label), bgWithUnit))
+        if (state.submitting || state.bg <= 0) return
+        val bgMgdl = profileUtil.convertToMgdl(state.bg, state.units)
+        _uiState.update { it.copy(submitting = true) }
+        viewModelScope.launch {
+            try {
+                when (val prepared = batchExecutor.prepare(listOf(BatchAction.Calibration(bgMgdl)), Sources.CalibrationDialog, label())) {
+                    is ActionProgress.Prepared -> _confirmation.value = Confirmation(prepared.id, prepared.lines)
+                    is ActionProgress.Rejected -> reject(prepared)
+                    else                       -> Unit
+                }
+            } finally {
+                _uiState.update { it.copy(submitting = false) }
+            }
         }
     }
 
-    fun confirmAndSave() {
-        if (_uiState.value.submitting) return
-        val state = confirmedState ?: return
-        if (state.bg <= 0) return
+    /** The user confirmed the master's description: the master stores the calibration. */
+    fun confirmCalibration() {
+        val pending = _confirmation.value ?: return
+        _confirmation.value = null
         _uiState.update { it.copy(submitting = true) }
-        val bgMgdl = profileUtil.convertToMgdl(state.bg, state.units)
-        val timestamp = dateUtil.now()
         viewModelScope.launch {
             try {
-                val unitValue = ValueWithUnit.fromGlucoseUnit(state.bg, state.units)
-                if (sendToSensor(bgMgdl, timestamp, unitValue)) return@launch
-                val result = activePlugin.activeCalibration.addEntry(bgMgdl, timestamp)
-                when (result) {
-                    AddEntryResult.Accepted    -> {
-                        uel.log(action = Action.CALIBRATION, source = Sources.CalibrationDialog, value = unitValue)
-                        if (xDripSource.isEnabled()) xDripBroadcast.sendCalibration(state.bg)
-                        val message = notYetEffectiveMessage(activePlugin.activeCalibration.status())
-                        _sideEffect.emit(SideEffect.EntryAccepted(message))
-                    }
-
-                    is AddEntryResult.Rejected -> {
-                        val message = result.message()
-                        uel.log(
-                            action = Action.CALIBRATION,
-                            source = Sources.CalibrationDialog,
-                            note = "rejected: $message",
-                            value = unitValue
-                        )
-                        _sideEffect.emit(SideEffect.EntryRejected(message))
-                    }
+                when (val result = batchExecutor.commit(pending.id, Sources.CalibrationDialog, label())) {
+                    ActionProgress.Applied     -> _sideEffect.emit(SideEffect.EntryAccepted(acceptedMessage()))
+                    is ActionProgress.Rejected -> reject(result)
+                    else                       -> Unit
                 }
             } finally {
                 _uiState.update { it.copy(submitting = false) }
@@ -215,48 +210,14 @@ class CalibrationDialogViewModel(
     }
 
     /**
-     * Hand the value to the sensor instead of fitting a line on top of it, when the source does that.
-     *
-     * Never both. A sensor that holds its own calibration re-bases its algorithm, so a line fitted
-     * in the app on top of the corrected readings would apply the correction a second time. The way
-     * that is enforced is simply not to store a calibration entry at all — with nothing to fit, the
-     * software plugin stays identity for this sensor by itself, which is also what xDrip does for
-     * this sensor family.
-     *
-     * The value is only on its way when this returns: the sensor sleeps between its radio windows,
-     * and this one does not report back in a way the app can read (see
-     * docs/DEXCOM_ONEPLUS_CALIBRATION_TO_SENSOR.md §2c). So the user is told it was sent and told to
-     * check, never told it was accepted.
-     *
-     * @return true when the value was routed to the sensor and nothing else should be done with it
+     * What the user should be told after the master took the calibration, or null. Only the master knows its own
+     * sensor, so a client says nothing. A sensor that holds its own calibration only has the value on its way
+     * (see `MasterRecordWriter.addCalibration`), so the user is asked to check it, never told it was accepted.
      */
-    private suspend fun sendToSensor(bgMgdl: Double, timestamp: Long, unitValue: ValueWithUnit): Boolean {
-        val source = activePlugin.activeBgSource
-        if (!source.calibratesInSensor()) return false
-        when (val sent = source.calibrateSensor(bgMgdl.roundToInt(), timestamp)) {
-            SensorCalibrationResult.Queued       -> {
-                uel.log(
-                    action = Action.CALIBRATION,
-                    source = Sources.CalibrationDialog,
-                    note = "sent to sensor",
-                    value = unitValue
-                )
-                _sideEffect.emit(SideEffect.EntryAccepted(rh.gs(UiStrings.cal_sent_to_sensor)))
-            }
-
-            is SensorCalibrationResult.Refused   -> {
-                uel.log(
-                    action = Action.CALIBRATION,
-                    source = Sources.CalibrationDialog,
-                    note = "sensor refused: ${sent.reason}",
-                    value = unitValue
-                )
-                _sideEffect.emit(SideEffect.EntryRejected(sent.reason))
-            }
-
-            SensorCalibrationResult.NotSupported -> return false
-        }
-        return true
+    private suspend fun acceptedMessage(): String? {
+        if (config.AAPSCLIENT) return null
+        if (activePlugin.activeBgSource.calibratesInSensor()) return rh.gs(UiStrings.cal_sent_to_sensor)
+        return notYetEffectiveMessage(activePlugin.activeCalibration.status())
     }
 
     // NoSession/WarmUp are unreachable here: addEntry() already required a running, past-warm-up
@@ -264,7 +225,29 @@ class CalibrationDialogViewModel(
     private fun notYetEffectiveMessage(status: CalibrationStatus): String? = when (status) {
         is CalibrationStatus.NeedMoreEntries -> rh.gs(UiStrings.cal_saved_need_more_entries, status.entryCount)
         CalibrationStatus.UnsafeFit          -> rh.gs(UiStrings.cal_saved_unsafe_fit)
-        else                                  -> null
+        else                                 -> null
+    }
+
+    /** The user cancelled. The master drops the prepared calibration on its own after a while. */
+    fun dismissCalibration() {
+        _confirmation.value = null
+    }
+
+    private fun label(): String = rh.gs(CoreUiStrings.calibration)
+
+    /**
+     * A refusal: the master's reason (BG changing too fast, no sensor session, ...) or this client's offline block.
+     * On a client the round-trip modal already shows a reason that came back from the master. A commit that was
+     * already used (a double tap) stays silent.
+     */
+    private suspend fun reject(rejected: ActionProgress.Rejected) {
+        if (rejected.reason == FailureReason.NoPendingBolus) return
+        val message = when {
+            rejected.reason.isNotDeliveryError() -> rh.gs(rejected.reason.failText())
+            config.AAPSCLIENT                    -> return
+            else                                 -> rejected.detail ?: rh.gs(rejected.reason.failText())
+        }
+        _sideEffect.emit(SideEffect.EntryRejected(message))
     }
 
     fun preconditionMessage(rejected: AddEntryResult.Rejected): String = when (rejected) {
@@ -278,19 +261,6 @@ class CalibrationDialogViewModel(
         )
 
         AddEntryResult.Rejected.NoSensorPair    -> rh.gs(UiStrings.cal_precheck_no_pair)
-    }
-
-    private fun AddEntryResult.Rejected.message(): String = when (this) {
-        is AddEntryResult.Rejected.DeltaTooHigh -> rh.gs(
-            UiStrings.cal_reject_delta_too_high,
-            formatDeltaInDisplayUnit(deltaMgdlPer5Min),
-            formatDeltaInDisplayUnit(thresholdMgdlPer5Min),
-            profileUtil.unitLabel
-        )
-
-        AddEntryResult.Rejected.NoSensorPair    -> rh.gs(UiStrings.cal_reject_no_pair)
-        is AddEntryResult.Rejected.InWarmUp     -> rh.gs(UiStrings.cal_reject_warmup)
-        AddEntryResult.Rejected.NoSession       -> rh.gs(UiStrings.cal_reject_no_session)
     }
 
     // Input is already in mg/dL per 5 min — just convert to the user's display unit.

@@ -17,7 +17,7 @@ import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.aps.Loop
-import app.aaps.core.interfaces.bolus.WizardBolusExecutor
+import app.aaps.core.interfaces.bolus.MasterActionExecutor
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
@@ -138,10 +138,10 @@ class SmsCommunicatorPlugin(
     notificationManager: NotificationManager,
     private val runningModeGuard: RunningModeGuard,
     private val bolusProgressData: BolusProgressData,
-    // Deferred on purpose. Metro finds a cycle otherwise: WizardBolusExecutorImpl needs Automation, and
+    // Deferred on purpose. Metro finds a cycle otherwise: MasterActionExecutorImpl needs Automation, and
     // automation's ActionFactory needs SmsCommunicator, which is this plugin. Nothing here touches the
     // executor while the graph is being built - it is only used once a command arrives.
-    private val wizardBolusExecutorProvider: () -> WizardBolusExecutor,
+    private val masterActionExecutorProvider: () -> MasterActionExecutor,
     val repository: SmsCommunicatorRepository
 ) : PluginBaseWithPreferences(
     PluginDescription()
@@ -428,7 +428,7 @@ class SmsCommunicatorPlugin(
             replyToAll = replyToAll,
             pumpCommand = pumpCommand,
             receivedSms = receivedSms,
-            wizardBolusExecutor = wizardBolusExecutorProvider(),
+            masterActionExecutor = masterActionExecutorProvider(),
             rh = rh,
             smsCommunicator = this,
             sendSMSToAllNumbers = ::sendSMSToAllNumbers
@@ -677,7 +677,7 @@ class SmsCommunicatorPlugin(
                             profileName = list[pIndex - 1] as String,
                             percentage = finalPercentage,
                             receivedSms = receivedSms,
-                            wizardBolusExecutor = wizardBolusExecutorProvider(),
+                            masterActionExecutor = masterActionExecutorProvider(),
                             rh = rh,
                             smsCommunicator = this
                         )
@@ -697,7 +697,7 @@ class SmsCommunicatorPlugin(
                 receivedSms, reply, passCode,
                 BasalCancelAction(
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     rh = rh,
                     smsCommunicator = this,
                     sendSMSToAllNumbers = ::sendSMSToAllNumbers,
@@ -745,7 +745,7 @@ class SmsCommunicatorPlugin(
                         isPercent = isPercent,
                         durationMinutes = duration,
                         receivedSms = receivedSms,
-                        wizardBolusExecutor = wizardBolusExecutorProvider(),
+                        masterActionExecutor = masterActionExecutorProvider(),
                         rh = rh,
                         smsCommunicator = this,
                         sendSMSToAllNumbers = ::sendSMSToAllNumbers,
@@ -765,7 +765,7 @@ class SmsCommunicatorPlugin(
                 receivedSms, reply, passCode,
                 ExtendedCancelAction(
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     rh = rh,
                     smsCommunicator = this,
                     sendSMSToAllNumbers = ::sendSMSToAllNumbers,
@@ -795,7 +795,7 @@ class SmsCommunicatorPlugin(
                         insulin = extended,
                         durationMinutes = duration,
                         receivedSms = receivedSms,
-                        wizardBolusExecutor = wizardBolusExecutorProvider(),
+                        masterActionExecutor = masterActionExecutorProvider(),
                         config = config,
                         rh = rh,
                         smsCommunicator = this,
@@ -832,7 +832,7 @@ class SmsCommunicatorPlugin(
                     insulin = bolus,
                     isMeal = isMeal,
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     commandQueue = commandQueue,
                     rh = rh,
                     profileUtil = profileUtil,
@@ -890,7 +890,7 @@ class SmsCommunicatorPlugin(
                     grams = grams,
                     timestamp = time,
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     dateUtil = dateUtil,
                     rh = rh,
                     smsCommunicator = this,
@@ -921,7 +921,7 @@ class SmsCommunicatorPlugin(
                 TempTargetSetAction(
                     reason = reason,
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     preferences = preferences,
                     profileUtil = profileUtil,
                     decimalFormatter = decimalFormatter,
@@ -938,7 +938,7 @@ class SmsCommunicatorPlugin(
                 receivedSms, reply, passCode,
                 TempTargetCancelAction(
                     receivedSms = receivedSms,
-                    wizardBolusExecutor = wizardBolusExecutorProvider(),
+                    masterActionExecutor = masterActionExecutorProvider(),
                     rh = rh,
                     smsCommunicator = this,
                     sendSMSToAllNumbers = ::sendSMSToAllNumbers

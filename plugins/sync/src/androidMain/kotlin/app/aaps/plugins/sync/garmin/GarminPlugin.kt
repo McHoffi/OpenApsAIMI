@@ -6,14 +6,17 @@ import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.interfaces.InterfacesStrings
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginBaseWithPreferences
 import app.aaps.core.interfaces.plugin.PluginDescription
-import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.core.interfaces.resources.TextResolver
 import app.aaps.core.interfaces.rx.collectResilient
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.ui.compose.icons.IcPluginGarmin
@@ -60,6 +63,9 @@ import kotlinx.coroutines.runBlocking
  * This plugin supports sending glucose values to Garmin devices and receiving
  * carbs, heart rate and pump disconnect events from the device. It communicates
  * via HTTP on localhost or Garmin's native CIQ library.
+ *
+ * On a client it only shows values: carbs and pump connect or disconnect from the
+ * watch are refused there, see [refuseOnClient].
  */
 @ContributesIntoMap(AppScope::class, binding = binding<PluginBase>())
 @IntKey(370)
@@ -67,12 +73,13 @@ import kotlinx.coroutines.runBlocking
 @Inject
 class GarminPlugin(
     aapsLogger: AAPSLogger,
-    resourceHelper: ResourceHelper,
+    rh: TextResolver,
     preferences: Preferences,
     private val sp: SP,
     private val context: Context,
     private val loopHub: LoopHub,
     private val persistenceLayer: PersistenceLayer,
+    private val config: Config,
     notificationManager: NotificationManager
 ) : PluginBaseWithPreferences(
     pluginDescription = PluginDescription()
@@ -81,7 +88,7 @@ class GarminPlugin(
         .pluginName(SyncStrings.garmin)
         .description(SyncStrings.garmin_description),
     ownPreferences = GarminStringKey.entries + GarminBooleanKey.entries + GarminIntKey.entries,
-    aapsLogger, resourceHelper, preferences, notificationManager
+    aapsLogger, rh, preferences, notificationManager
 ) {
 
     /** HTTP Server for local HTTP server communication (device app requests values) .*/
@@ -832,7 +839,10 @@ class GarminPlugin(
 
     private fun postCarbs(carbs: Int) {
         if (carbs > 0) {
-            loopHub.postCarbs(carbs)
+            if (config.AAPSCLIENT)
+                refuseOnClient(rh.gs(SyncStrings.garmin_carbs_not_on_client, rh.gs(InterfacesStrings.format_carbs, carbs)))
+            else
+                loopHub.postCarbs(carbs)
         }
     }
 
@@ -878,7 +888,9 @@ class GarminPlugin(
     @VisibleForTesting
     fun onConnectPump(uri: URI): CharSequence {
         val minutes = getQueryParameter(uri, "disconnectMinutes", 0L).toInt()
-        if (minutes > 0) {
+        if (config.AAPSCLIENT) {
+            refuseOnClient(rh.gs(SyncStrings.garmin_pump_not_on_client))
+        } else if (minutes > 0) {
             loopHub.disconnectPump(minutes)
         } else {
             loopHub.connectPump()
@@ -887,6 +899,15 @@ class GarminPlugin(
         val jo = JsonObject()
         jo.addProperty("connected", loopHub.isConnected)
         return jo.toString()
+    }
+
+    /**
+     * A client only shows values on the watch. Carbs or a pump disconnect stored here would stay on the client and
+     * never reach the master, so they are not used. The watch cannot show why, so the phone says it.
+     */
+    private fun refuseOnClient(text: String) {
+        aapsLogger.warn(LTag.GARMIN, "not used on a client: $text")
+        notificationManager.post(id = NotificationId.GARMIN_NOT_ON_CLIENT, text = text)
     }
 
     private fun glucoseSlopeMgDlPerMilli(glucose1: GV, glucose2: GV): Double {

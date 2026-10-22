@@ -407,7 +407,9 @@ fun GraphsSection(
      * announcing them beside a past day would state something untrue about insulin.
      */
     iobText: String? = null,
-    cobText: String? = null
+    cobText: String? = null,
+    /** Height of the bars drawn over the end of this section (the overview's preview mode), added to the space at its end. */
+    overlaidBarsHeight: Dp = 0.dp
 ) {
     val savedGraphConfig by graphViewModel.graphConfigFlow.collectAsStateWithLifecycle()
     // In simple mode: fixed layout (BG, IOB+BAS, COB — no overlays, no editing)
@@ -1153,7 +1155,7 @@ fun GraphsSection(
             }
         }
         // Spacer so the last graph / Add button isn't covered by QuickLaunch toolbar
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(48.dp + overlaidBarsHeight))
     }
 }
 

@@ -16,7 +16,7 @@ import app.aaps.core.data.ue.ValueWithUnit
 import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.aps.RT
-import app.aaps.core.interfaces.bolus.WizardBolusExecutor
+import app.aaps.core.interfaces.bolus.MasterActionExecutor
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
@@ -69,7 +69,7 @@ class LoopHubImpl(
     private val preferences: Preferences,
     private val processedTbrEbData: ProcessedTbrEbData,
     private val dateUtil: DateUtil,
-    private val wizardBolusExecutor: WizardBolusExecutor,
+    private val masterActionExecutor: MasterActionExecutor,
     private val activePlugin: ActivePlugin,
     @ApplicationScope private val appScope: CoroutineScope
 ) : LoopHub {
@@ -373,7 +373,7 @@ class LoopHubImpl(
             carbohydrates.coerceAtMost(constraintChecker.getMaxCarbsAllowed().value())
         // Instant carbs now ride the shared executor (one audited path); it logs the user entry + delivers.
         appScope.launch {
-            wizardBolusExecutor.deliverCarbs(
+            masterActionExecutor.deliverCarbs(
                 carbs = carbsAfterConstraints,
                 note = null,
                 source = Sources.Garmin,

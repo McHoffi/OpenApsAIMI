@@ -67,8 +67,8 @@ fun CalibrationDialogScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val confirmation by viewModel.confirmation.collectAsStateWithLifecycle()
 
-    var showConfirmation by rememberSaveable { mutableStateOf(false) }
     var showNoAction by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -85,21 +85,14 @@ fun CalibrationDialogScreen(
         }
     }
 
-    if (showConfirmation) {
-        if (!viewModel.hasAction()) {
-            showConfirmation = false
-            showNoAction = true
-        } else {
-            ElementConfirmationDialog(
-                elementType = ElementType.CALIBRATION,
-                lines = viewModel.buildConfirmationSummary(),
-                onConfirm = {
-                    viewModel.confirmAndSave()
-                    showConfirmation = false
-                },
-                onDismiss = { showConfirmation = false }
-            )
-        }
+    // The master's description of the calibration
+    confirmation?.let { pending ->
+        ElementConfirmationDialog(
+            elementType = ElementType.CALIBRATION,
+            lines = pending.lines,
+            onConfirm = { viewModel.confirmCalibration() },
+            onDismiss = { viewModel.dismissCalibration() }
+        )
     }
 
     if (showNoAction) {
@@ -122,7 +115,7 @@ fun CalibrationDialogScreen(
         onMarkSensorChange = viewModel::markSensorChangeNow,
         onBgChange = viewModel::updateBg,
         onNavigateBack = onNavigateBack,
-        onConfirmClick = { showConfirmation = true }
+        onConfirmClick = { if (viewModel.hasAction()) viewModel.requestCalibration() else showNoAction = true }
     )
 }
 

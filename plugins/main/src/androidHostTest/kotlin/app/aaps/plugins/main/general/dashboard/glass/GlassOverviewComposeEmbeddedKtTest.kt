@@ -44,6 +44,7 @@ class GlassOverviewComposeEmbeddedKtTest {
         carbs = emptyList(),
         extendedBoluses = emptyList(),
         therapyEvents = emptyList(),
+        calibrations = emptyList(),
     )
 
     @Test

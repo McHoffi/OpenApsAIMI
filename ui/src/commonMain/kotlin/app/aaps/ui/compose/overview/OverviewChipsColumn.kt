@@ -15,6 +15,7 @@ import app.aaps.core.data.model.RM
 import app.aaps.core.data.model.TT
 import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.interfaces.overview.graph.TbrState
+import app.aaps.core.ui.compose.LocalClientRole
 import app.aaps.core.ui.compose.navigation.NavigationRequest
 import app.aaps.core.ui.compose.stringResource
 import app.aaps.ui.compose.main.TempTargetChipState
@@ -137,7 +138,7 @@ private fun NarrowChips(
                     remaining = runningModeRemaining,
                     sceneManaged = runningModeSceneManaged,
                     smbEnabled = smbEnabled,
-                    enabled = commandsAllowed,
+                    enabled = commandsAllowed && LocalClientRole.current.allows(ElementType.RUNNING_MODE.role),
                     onClick = { onNavigate(NavigationRequest.Element(ElementType.RUNNING_MODE)) }
                 )
             }
@@ -148,7 +149,7 @@ private fun NarrowChips(
                     progress = tempTargetProgress,
                     reason = tempTargetReason,
                     onClick = { onNavigate(NavigationRequest.Element(ElementType.TEMP_TARGET_MANAGEMENT)) },
-                    enabled = commandsAllowed,
+                    enabled = commandsAllowed && LocalClientRole.current.allows(ElementType.TEMP_TARGET_MANAGEMENT.role),
                     modifier = Modifier.fillMaxWidth(),
                     sceneManaged = tempTargetSceneManaged
                 )

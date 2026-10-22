@@ -4,6 +4,7 @@ import app.aaps.plugins.constraints.objectives.compose.ObjectivesViewModel
 import app.aaps.plugins.main.general.dashboard.glass.GlassLoopDashboardViewModel
 import app.aaps.plugins.sync.nsclientV3.clientcontrol.compose.AuthorizedClientsViewModel
 import app.aaps.plugins.sync.nsclientV3.clientcontrol.compose.PairWithMasterViewModel
+import app.aaps.plugins.sync.nsclientV3.clientcontrol.compose.ScanMasterQrViewModel
 import app.aaps.plugins.sync.nsclientV3.compose.NSClientViewModel
 import app.aaps.plugins.sync.smsCommunicator.compose.SmsCommunicatorViewModel
 import app.aaps.plugins.sync.tidepool.compose.TidepoolViewModel
@@ -41,6 +42,7 @@ class ContributedViewModelsTest {
             NSClientViewModel::class,
             AuthorizedClientsViewModel::class,
             PairWithMasterViewModel::class,
+            ScanMasterQrViewModel::class,
             WearViewModel::class
         )
     }
