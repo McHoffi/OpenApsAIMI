@@ -87,6 +87,8 @@ enum class StringNonKey(
         defaultValue = "ACTIONS,RAPID_ACTING,PROFILE,AUTOMATION,NSCLIENT,TIDEPOOL,XDRIP,MAINTENANCE,XDRIP_BG,SENSOR,ADVISOR,MEAL_ADVISOR,AIMI_CONTEXT,AUDITOR_REPORT",
         exportable = false
     ),
+    // The tab the Statistics screen opens on: the last one used (per-device UI state, not a user-facing preference)
+    StatsTab(key = "stats_tab", defaultValue = "", exportable = false),
 
     // Synthetic mirror of the active plugin per single-select category (value = plugin pluginId, defaults to
     // javaClass.simpleName). Bidirectional for APS/SENSITIVITY/SMOOTHING/CALIBRATION (a client may switch the

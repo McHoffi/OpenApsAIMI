@@ -63,19 +63,19 @@ fun AapsClientStatusCard(
             .bringIntoViewRequester(expandRequester)
     ) {
         Column {
-            // Header row — compact chips + expand/collapse toggle
+            // Header row — compact chips + expand/collapse toggle. Padded like the status section's row
+            // (around the whole row, so the chevron counts), which makes the two cards the same height.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(flavorTint)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FlowRow(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { expanded = !expanded }
-                        .padding(vertical = 4.dp),
+                        .clickable { expanded = !expanded },
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
                 ) {
                     items.forEach { item ->
