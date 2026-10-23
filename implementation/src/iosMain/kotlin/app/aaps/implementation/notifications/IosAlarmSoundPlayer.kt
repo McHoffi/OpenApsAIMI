@@ -3,6 +3,7 @@ package app.aaps.implementation.notifications
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.AlarmSound
+import app.aaps.core.interfaces.notifications.AlarmSoundCategory
 import app.aaps.core.interfaces.notifications.AlarmSoundPlayer
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -72,8 +73,10 @@ class IosAlarmSoundPlayer(
      * [postedAtElapsedRealtime] is ignored: it exists so Android can wait out a notification's own
      * one-shot channel sound before starting the loop, and an iOS notification posted by
      * `IosSystemNotificationPlatform` deliberately carries no sound.
+     *
+     * [category] is ignored too: the soft alarm melodies are an Android feature, so iOS always plays the AAPS sound.
      */
-    override fun play(sound: AlarmSound, ownerTag: String, postedAtElapsedRealtime: Long) {
+    override fun play(sound: AlarmSound, ownerTag: String, postedAtElapsedRealtime: Long, category: AlarmSoundCategory) {
         scope.launch { doPlay(sound, ownerTag) }
     }
 

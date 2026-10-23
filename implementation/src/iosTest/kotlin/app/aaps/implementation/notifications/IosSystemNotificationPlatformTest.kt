@@ -4,6 +4,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.AapsNotification
 import app.aaps.core.interfaces.notifications.AlarmSound
+import app.aaps.core.interfaces.notifications.AlarmSoundCategory
 import app.aaps.core.interfaces.notifications.AlarmSoundPlayer
 import app.aaps.core.interfaces.notifications.NotificationAction
 import app.aaps.core.interfaces.notifications.NotificationId
@@ -55,7 +56,7 @@ class IosSystemNotificationPlatformTest {
 
         val calls = mutableListOf<String>()
 
-        override fun play(sound: AlarmSound, ownerTag: String, postedAtElapsedRealtime: Long) {
+        override fun play(sound: AlarmSound, ownerTag: String, postedAtElapsedRealtime: Long, category: AlarmSoundCategory) {
             calls.add("play:${sound.name}")
         }
 

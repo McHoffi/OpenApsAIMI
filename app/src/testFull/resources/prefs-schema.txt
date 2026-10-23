@@ -206,6 +206,8 @@ alert_hypo_threshold|UnitDoubleKey|true
 alert_override_dnd|BooleanKey|true
 alert_rapid_fall_drop|UnitDoubleKey|true
 alert_rapid_fall_window|IntKey|true
+alert_sound_low_glucose|StringKey|true
+alert_sound_other_alarms|StringKey|true
 allow_hardware_pump|BooleanNonKey|true
 always_use_shortavg|BooleanKey|true
 app_expiration_%s|LongComposedKey|true

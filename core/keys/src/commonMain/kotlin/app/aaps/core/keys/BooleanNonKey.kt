@@ -25,7 +25,7 @@ enum class BooleanNonKey(
     WizardIncludeCob("wizard_include_cob", false),
     WizardIncludeTrend("wizard_include_trend_bg", false),
 
-    // Export destination settings (managed by ExportOptionsDialog, no preferences UI)
+    // Export destination settings (maintenance bottom sheet + SP mirror; no dedicated preference screen)
     ExportAllCloudEnabled("export_all_cloud_enabled", false),
     ExportLogEmailEnabled("export_log_email_enabled", true),
     ExportLogCloudEnabled("export_log_cloud_enabled", false),
@@ -40,6 +40,21 @@ enum class BooleanNonKey(
     // set on the next launch, the previous VACUUM died below the JVM (native abort / OOM) — used to
     // break the boot-crash loop. Transient device state, not a user setting → not exportable.
     VacuumInProgress("vacuum_in_progress", false, exportable = false),
+
+    /**
+     * One-shot: after AIMI endocrine Lot A upgrade, re-enable T3C adaptive basal if Stability/HYPO_GUARD
+     * writeback had forced it off. User may disable again afterward.
+     */
+    AimiAdaptiveBasalReenabledOnUpgrade("aimi_adaptive_basal_reenabled_on_upgrade", false, exportable = false),
+
+    /**
+     * One-shot: on first launch after the Glass top-grid pills (pump/cannula/battery/sensor/loop/activity)
+     * became personalizable, merges their defaults into any already-persisted [StringNonKey.GlassSelectedPills]
+     * value — installs that customized their pill selection before this shipped would otherwise never see
+     * the new pills (their raw value predates those IDs). No-op for a fresh install (its value already has
+     * them from the class default). See GlassOverviewComposeEmbedded.kt's migration LaunchedEffect.
+     */
+    GlassTopGridPillsMigrated("glass_top_grid_pills_migrated", false, exportable = false),
 
     // Client: the pairing secret has been replaced by the key exchange in the hello. Until then the client sends a hello
     // with a key on each connection, which is also how a phone paired from a QR code says hello at all. Belongs to the

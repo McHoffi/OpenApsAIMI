@@ -255,6 +255,33 @@ enum class StringKey(
         title = KeysStrings.pref_title_aimi_sos_phone,
         summary = KeysStrings.pref_summary_aimi_sos_phone,
         dependency = BooleanKey.AimiEmergencySosEnable),
+    /** Sound of the low-glucose alarms (hypo, rapid fall): the AAPS sound or a soft generated melody. */
+    AlertSoundLowGlucose(
+        key = "alert_sound_low_glucose",
+        defaultValue = "default",
+        title = KeysStrings.pref_title_alert_sound_low_glucose,
+        summary = KeysStrings.pref_summary_alert_sound,
+        preferenceType = PreferenceType.LIST, entriesRefs = mapOf(
+            "default" to KeysStrings.alert_sound_default,
+            "soft_chime" to KeysStrings.alert_sound_soft_chime,
+            "warm_bells" to KeysStrings.alert_sound_warm_bells,
+            "marimba" to KeysStrings.alert_sound_marimba,
+            "gentle_pulse" to KeysStrings.alert_sound_gentle_pulse
+        )),
+
+    /** Sound of every other urgent alarm (pump, missed readings, …). Same choices. */
+    AlertSoundOtherAlarms(
+        key = "alert_sound_other_alarms",
+        defaultValue = "default",
+        title = KeysStrings.pref_title_alert_sound_other_alarms,
+        summary = KeysStrings.pref_summary_alert_sound,
+        preferenceType = PreferenceType.LIST, entriesRefs = mapOf(
+            "default" to KeysStrings.alert_sound_default,
+            "soft_chime" to KeysStrings.alert_sound_soft_chime,
+            "warm_bells" to KeysStrings.alert_sound_warm_bells,
+            "marimba" to KeysStrings.alert_sound_marimba,
+            "gentle_pulse" to KeysStrings.alert_sound_gentle_pulse
+        )),
     OverviewVicoChartBackdrop(
         key = "overview_vico_chart_backdrop",
         defaultValue = "theme",

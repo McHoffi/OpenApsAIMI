@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.AapsNotification
 import app.aaps.core.interfaces.notifications.AlarmSound
+import app.aaps.core.interfaces.notifications.AlarmSoundCategory
 import app.aaps.core.interfaces.notifications.AlarmSoundPlayer
 import app.aaps.core.interfaces.notifications.NotificationHolder
 import app.aaps.core.interfaces.notifications.NotificationLevel
@@ -55,6 +56,12 @@ class AndroidSystemNotificationPlatform(
     /** instanceKey of the alarm currently owning [AlarmSoundPlayer.OWNER_INTERNAL], null when silent. */
     private var soundingKey: Int? = null
 
+    /**
+     * Which sound choice each audible alarm uses, remembered in [show] where the notification id is known.
+     * [setAudibleAlarm] only gets the instance key. A key missing here plays the shared "other alarms" choice.
+     */
+    private val soundCategories = mutableMapOf<Int, AlarmSoundCategory>()
+
     private var dismissCallback: ((Int) -> Unit)? = null
 
     /** Guards the one-off channel + receiver setup done by [ensureStarted]. */
@@ -84,6 +91,7 @@ class AndroidSystemNotificationPlatform(
     override fun show(notification: AapsNotification, title: String) {
         ensureStarted()
         if (notification.level == NotificationLevel.URGENT && notification.sound != null) {
+            soundCategories[notification.instanceKey] = AlarmSoundCategory.of(notification.id)
             alarmNotificationManager().postSilentAlarmNotification(
                 notificationKey = notification.instanceKey,
                 title = title,
@@ -97,6 +105,7 @@ class AndroidSystemNotificationPlatform(
 
     override fun cancel(instanceKey: Int) {
         // Harmless when this key never carried a sound - the alarm manager only tracks the ones it posted.
+        soundCategories.remove(instanceKey)
         alarmNotificationManager().cancelSoundAlarm(instanceKey)
         notificationManager.cancel(instanceKey)
     }
@@ -122,7 +131,9 @@ class AndroidSystemNotificationPlatform(
         // Called again with the same key means "keep playing" - restarting would reset the ramp.
         if (instanceKey != soundingKey) {
             soundingKey = instanceKey
-            alarmSoundPlayer().play(sound, AlarmSoundPlayer.OWNER_INTERNAL)
+            alarmSoundPlayer().play(
+                sound, AlarmSoundPlayer.OWNER_INTERNAL, category = soundCategories[instanceKey] ?: AlarmSoundCategory.OTHER
+            )
         }
     }
 
