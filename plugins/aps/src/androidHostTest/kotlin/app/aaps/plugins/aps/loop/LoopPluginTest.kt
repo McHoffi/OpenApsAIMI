@@ -104,7 +104,7 @@ class LoopPluginTest : TestBaseWithProfile() {
         // The shared test base still hands out a javax Provider, which other tests rely on;
         // LoopPlugin takes Metro's now, so it is adapted here rather than flipping the base.
         persistenceLayer, uiInteraction, notificationManager, loopNotifier, { pumpEnactResultProvider() },
-        processedDeviceStatusData, pumpStatusProvider, decimalFormatter, ch, runningModeReconciler, testScope
+        processedDeviceStatusData, pumpStatusProvider, ch, runningModeReconciler, testScope
     )
 
     /**

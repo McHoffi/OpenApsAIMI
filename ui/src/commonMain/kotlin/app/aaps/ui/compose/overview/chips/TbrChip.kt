@@ -24,6 +24,7 @@ import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.compose.AapsSpacing
 import app.aaps.core.ui.compose.AapsTheme
+import app.aaps.core.ui.compose.LocalAapsScale
 import app.aaps.core.ui.compose.icons.IcNoTbr
 import app.aaps.core.ui.compose.icons.IcTbrHigh
 import app.aaps.core.ui.compose.icons.IcTbrLow
@@ -72,7 +73,7 @@ fun TbrChip(
         val glass = LocalOverviewGlass.current
         if (glass.enabled) {
             OverviewGlassChipFrame(
-                modifier = modifier.height(AapsSpacing.chipHeight).semantics { stateDescription = tbrState },
+                modifier = modifier.height(AapsSpacing.chipHeight * LocalAapsScale.current).semantics { stateDescription = tbrState },
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick() }
             ) { content() }
         } else {
@@ -80,7 +81,7 @@ fun TbrChip(
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick() },
                 shape = RoundedCornerShape(AapsSpacing.chipCornerRadius),
                 color = containerColor,
-                modifier = modifier.height(AapsSpacing.chipHeight).semantics { stateDescription = tbrState }
+                modifier = modifier.height(AapsSpacing.chipHeight * LocalAapsScale.current).semantics { stateDescription = tbrState }
             ) { content() }
         }
     }

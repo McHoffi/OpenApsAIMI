@@ -1,5 +1,6 @@
 package app.aaps.core.interfaces.rx.weardata
 
+import app.aaps.core.data.model.CarbsType
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,6 +68,10 @@ class EventDataTest {
             assertEquals(it, EventData.deserialize(it.serialize()))
         }
         EventData.ActionWizardPreCheck(1, 2).let {
+            assertEquals(it, EventData.deserializeByte(it.serializeByte()))
+            assertEquals(it, EventData.deserialize(it.serialize()))
+        }
+        EventData.ActionWizardPreCheck(1, 2, CarbsType.PIZZA).let {
             assertEquals(it, EventData.deserializeByte(it.serializeByte()))
             assertEquals(it, EventData.deserialize(it.serialize()))
         }
@@ -302,5 +307,15 @@ class EventDataTest {
         assertFalse(legacyJson.contains("loopMode"), legacyJson)
         val restored = EventData.deserialize(legacyJson) as EventData.Status
         assertEquals(LoopStatusData.LoopMode.UNKNOWN, restored.loopMode)
+    }
+
+    @Test
+    fun wizardPreCheckFromAWatchWithoutTheMealTypeIsBread() {
+        // The meal type came later. A watch from before sends no carbsType, and the default is bread, which
+        // is what every wizard entry was before: all carbs now, no eCarbs. The default is not written on the
+        // wire, so serializing without it is the old message.
+        val old = EventData.ActionWizardPreCheck(30, 100).serialize()
+        assertFalse(old.contains("carbsType"), old)
+        assertEquals(EventData.ActionWizardPreCheck(30, 100, CarbsType.BREAD), EventData.deserialize(old))
     }
 }

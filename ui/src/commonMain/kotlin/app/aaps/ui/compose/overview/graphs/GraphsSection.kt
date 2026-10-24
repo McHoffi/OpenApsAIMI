@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -112,6 +113,7 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 
 /**
@@ -456,7 +458,12 @@ fun GraphsSection(
     // objects forever, comparing live secondary-graph state against a frozen stale value and
     // firing wrong corrections (this caused the secondary graphs to visibly "dance"/flash on the
     // first attempt at this).
-    var bgViewportResetTrigger by remember { mutableIntStateOf(0) }
+    // Saved, not only remembered. The overview leaves the composition behind every other screen,
+    // and Vico saves the scroll under the key of the state that is alive then, key(N). With a plain
+    // remember the trigger came back as 0, key(0) had nothing saved, the scroll started at the end
+    // of the axis again, and with the predictions already loaded that end is hours in the future:
+    // "now" sat in the middle of the graph after every trip to the wizard, until the next reading.
+    var bgViewportResetTrigger by rememberSaveable { mutableIntStateOf(0) }
     val (bgScrollState, bgZoomState) = key(bgViewportResetTrigger) {
         rememberVicoScrollState(
             scrollEnabled = true,

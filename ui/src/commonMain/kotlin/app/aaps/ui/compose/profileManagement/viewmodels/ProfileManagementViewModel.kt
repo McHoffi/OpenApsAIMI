@@ -366,16 +366,9 @@ class ProfileManagementViewModel(
         return when {
             baseChanged                             -> {
                 val profileName = profiles[currentIndex].name
-                val runningLabel = buildString {
-                    append(rh.gs(CoreUiStrings.running))
-                    if (hasModifications) {
-                        val tsHours = (tsMs / 3600000).toInt()
-                        append(" (")
-                        append("$pct%")
-                        if (tsHours != 0) append(", ${if (tsHours > 0) "+" else ""}${tsHours}h")
-                        append(")")
-                    }
-                }
+                val runningLabel =
+                    if (hasModifications) labelWithModifications(rh.gs(CoreUiStrings.running), pct, (tsMs / 3600000).toInt())
+                    else rh.gs(CoreUiStrings.running)
                 val compareData = buildProfileCompareData(
                     profile1 = effectiveProfile,
                     profile2 = baseProfile,
@@ -392,14 +385,9 @@ class ProfileManagementViewModel(
             // Rounded by the pump only: the profile next to the rates the pump really gives.
             (hasModifications || roundedByPump) && baseProfile != null -> {
                 val profileName = profiles[currentIndex].name
-                val tsHours = (tsMs / 3600000).toInt()
-                val effectiveLabel = if (!hasModifications) rh.gs(CoreUiStrings.running) else buildString {
-                    append(profileName)
-                    append(" (")
-                    append("$pct%")
-                    if (tsHours != 0) append(", ${if (tsHours > 0) "+" else ""}${tsHours}h")
-                    append(")")
-                }
+                val effectiveLabel =
+                    if (!hasModifications) rh.gs(CoreUiStrings.running)
+                    else labelWithModifications(profileName, pct, (tsMs / 3600000).toInt())
                 val compareData = buildProfileCompareData(
                     profile1 = baseProfile,
                     profile2 = effectiveProfile,
@@ -556,6 +544,17 @@ class ProfileManagementViewModel(
             },
             onFailure = { failReorder() }
         )
+    }
+
+    /** "Weekend (110%)", or "Weekend (110%, +2 h)" when the profile is also shifted in time. */
+    private fun labelWithModifications(name: String, percentage: Int, timeshiftHours: Int): String {
+        val percentageText = rh.gs(CoreUiStrings.units_format_percent, percentage)
+        val details =
+            if (timeshiftHours != 0) {
+                val timeshift = rh.gs(CoreUiStrings.value_with_unit, if (timeshiftHours > 0) "+$timeshiftHours" else "$timeshiftHours", rh.gs(InterfacesStrings.shorthour))
+                rh.gs(InterfacesStrings.values_with_comma, percentageText, timeshift)
+            } else percentageText
+        return rh.gs(InterfacesStrings.value_with_detail, name, details)
     }
 
     private fun failReorder(): Int? {

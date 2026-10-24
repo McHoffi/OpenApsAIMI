@@ -547,8 +547,8 @@ open class OpenAPSAutoISFPlugin(
         var sensitivityRatio = 1.0
         // TODO eliminate
         val target_bg = (minBg + maxBg) / 2
-        val exerciseModeActive = highTemptargetRaisesSensitivity && isTempTarget && target_bg > normalTarget
-        val resistanceModeActive = oapsProfile.low_temptarget_lowers_sensitivity && isTempTarget && target_bg < normalTarget
+        val exerciseModeActive = highTemptargetRaisesSensitivity && isTempTarget && Constants.isAboveNormalTarget(target_bg)
+        val resistanceModeActive = oapsProfile.low_temptarget_lowers_sensitivity && isTempTarget && Constants.isBelowNormalTarget(target_bg)
         if ( exerciseModeActive || resistanceModeActive || stepActivityDetected || stepInactivityDetected ) {
             if (exerciseModeActive || resistanceModeActive) {
                 // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
@@ -963,8 +963,8 @@ open class OpenAPSAutoISFPlugin(
         val stepActivityDetected = lastStepActivityDetected
         val stepInactivityDetected = lastStepInactivityDetected
         var sensitivityRatio = 1.0
-        val exerciseModeActive = high_temptarget_raises_sensitivity && isTempTarget && target_bg > normalTarget
-        val resistanceModeActive = preferences.get(BooleanKey.ApsAutoIsfLowTtLowersSens)  && isTempTarget && target_bg < normalTarget
+        val exerciseModeActive = high_temptarget_raises_sensitivity && isTempTarget && Constants.isAboveNormalTarget(target_bg)
+        val resistanceModeActive = preferences.get(BooleanKey.ApsAutoIsfLowTtLowersSens)  && isTempTarget && Constants.isBelowNormalTarget(target_bg)
         if ( exerciseModeActive || resistanceModeActive || stepActivityDetected || stepInactivityDetected ) {
             if ( exerciseModeActive || resistanceModeActive ) {
                 // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44

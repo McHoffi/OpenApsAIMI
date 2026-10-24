@@ -104,7 +104,7 @@ class DetermineBasalAutoISF(
         if (!microBolusAllowed) {
             consoleError.add("SMB disabled (!microBolusAllowed)")
             return false
-        } else if (!profile.allowSMB_with_high_temptarget && profile.temptargetSet && target_bg > 100) {
+        } else if (!profile.allowSMB_with_high_temptarget && profile.temptargetSet && Constants.isAboveNormalTarget(target_bg)) {
             consoleError.add("SMB disabled due to high temptarget of $target_bg")
             return false
         }
@@ -329,8 +329,8 @@ class DetermineBasalAutoISF(
         val stepInactivityDetected = profile.steps_inactivity_detected
         var sensitivityRatio = 1.0
         val normalTarget = Constants.NORMAL_TARGET_MGDL // evaluate high/low temptarget against normal target, not scheduled target (which might change)
-        val exerciseModeActive = (profile.exercise_mode || profile.high_temptarget_raises_sensitivity) && profile.temptargetSet && target_bg > normalTarget
-        val resistanceModeActive = profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && target_bg < normalTarget
+        val exerciseModeActive = (profile.exercise_mode || profile.high_temptarget_raises_sensitivity) && profile.temptargetSet && Constants.isAboveNormalTarget(target_bg)
+        val resistanceModeActive = profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && Constants.isBelowNormalTarget(target_bg)
         // when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%),  80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
         val mgdlHalfBasalTarget = profile.half_basal_exercise_target * if (profile.out_units == "mmol/L") GlucoseUnit.MMOLL_TO_MGDL else 1.0
         if ( exerciseModeActive || resistanceModeActive || stepActivityDetected || stepInactivityDetected ) {

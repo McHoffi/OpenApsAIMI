@@ -23,12 +23,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import app.aaps.core.data.model.TT
 import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.compose.AapsSpacing
 import app.aaps.core.ui.compose.AapsTheme
+import app.aaps.core.ui.compose.LocalAapsScale
 import app.aaps.core.ui.compose.icons.IcTtActivity
 import app.aaps.core.ui.compose.icons.IcTtEatingSoon
 import app.aaps.core.ui.compose.icons.IcTtHypo
@@ -98,11 +100,16 @@ fun TempTargetChip(
                     tint = iconColor,
                     modifier = Modifier.size(AapsSpacing.chipIconSize)
                 )
+                // One line, like the profile chip: a second line did not fit the chip's height.
                 Text(
                     text = targetText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = textColor,
-                    modifier = Modifier.padding(start = AapsSpacing.small)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(start = AapsSpacing.small)
                 )
                 if (sceneManaged) {
                     SceneBadge(modifier = Modifier.padding(start = AapsSpacing.small))
@@ -131,7 +138,7 @@ fun TempTargetChip(
         OverviewGlassChipFrame(
             modifier = modifier
                 .fillMaxWidth()
-                .height(AapsSpacing.chipHeight)
+                .height(AapsSpacing.chipHeight * LocalAapsScale.current)
                 .then(
                     if (reasonState != null) Modifier.semantics { stateDescription = reasonState }
                     else Modifier
@@ -149,7 +156,7 @@ fun TempTargetChip(
             tonalElevation = 0.dp,
             modifier = modifier
                 .fillMaxWidth()
-                .height(AapsSpacing.chipHeight)
+                .height(AapsSpacing.chipHeight * LocalAapsScale.current)
                 .then(
                     if (reasonState != null) Modifier.semantics { stateDescription = reasonState }
                     else Modifier

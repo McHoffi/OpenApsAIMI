@@ -60,7 +60,6 @@ import app.aaps.core.interfaces.rx.events.EventRefreshOverview
 import app.aaps.core.interfaces.rx.weardata.EventData
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
-import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.BooleanKey
@@ -139,7 +138,6 @@ class LoopPlugin(
     private val pumpEnactResultProvider: () -> PumpEnactResult,
     private val processedDeviceStatusData: ProcessedDeviceStatusData,
     private val pumpStatusProvider: PumpStatusProvider,
-    private val decimalFormatter: DecimalFormatter,
     private val ch: ConcentrationHelper,
     private val runningModeReconciler: RunningModeReconciler,
     @ApplicationScope private val appScope: CoroutineScope
@@ -152,7 +150,6 @@ class LoopPlugin(
                 rxBus = rxBus,
                 rh = rh,
                 dateUtil = dateUtil,
-                decimalFormatter = decimalFormatter,
                 aapsLogger = aapsLogger,
                 preferences = preferences
             )
