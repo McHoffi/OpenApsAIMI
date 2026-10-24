@@ -290,6 +290,8 @@ import app.aaps.plugins.aps.openAPSAIMI.pkpd.PkpdSoftFloorPathMin
 import app.aaps.plugins.aps.openAPSAIMI.pkpd.PkpdSoftFloorTelemetry
 import app.aaps.plugins.aps.openAPSAIMI.autodrive.AutodriveEngine
 import app.aaps.plugins.aps.openAPSAIMI.autodrive.learning.PhysiologicalStressMaskBuilder
+import app.aaps.plugins.aps.openAPSAIMI.autodrive.safety.RiseConfirmation
+import app.aaps.plugins.aps.openAPSAIMI.autodrive.safety.UndeclaredEvidenceCap
 import app.aaps.plugins.aps.openAPSAIMI.keys.AimiLongKey
 import java.io.File
 import java.text.DecimalFormat
@@ -648,6 +650,13 @@ internal data class AimiDecisionContext(
         var autodrive_gate_kind: String? = null,
         /** The same reason with its live numbers, for reading. */
         var autodrive_gate_reason: String? = null,
+        /** Rise confirmation from the glucose history alone (NONE, WEAK, CONFIRMED); null when history is too short. */
+        var rise_confirmation_level: String? = null,
+        /** True when the undeclared-rise evidence cap limited Autodrive on this tick. */
+        var evidence_cap_active: Boolean? = null,
+        var rise_confirmation_window_ticks: Int? = null,
+        var rise_confirmation_positive_share: Double? = null,
+        var rise_confirmation_net_mgdl: Double? = null,
         /**
          * Shadow measurement of the descent re-dose guard (`DescentRedoseGuard`).
          *
@@ -1152,6 +1161,11 @@ internal data class AimiDecisionContext(
             base.put("descent_redose_guard_reason", baseline_state.descent_redose_guard_reason ?: org.json.JSONObject.NULL)
             base.put("descent_redose_guard_withheld_u", baseline_state.descent_redose_guard_withheld_u ?: org.json.JSONObject.NULL)
 
+            base.put("rise_confirmation_level", baseline_state.rise_confirmation_level ?: org.json.JSONObject.NULL)
+            base.put("evidence_cap_active", baseline_state.evidence_cap_active ?: org.json.JSONObject.NULL)
+            base.put("rise_confirmation_window_ticks", baseline_state.rise_confirmation_window_ticks ?: org.json.JSONObject.NULL)
+            base.put("rise_confirmation_positive_share", baseline_state.rise_confirmation_positive_share ?: org.json.JSONObject.NULL)
+            base.put("rise_confirmation_net_mgdl", baseline_state.rise_confirmation_net_mgdl ?: org.json.JSONObject.NULL)
             base.put("rise_ceiling_guard_would_block", baseline_state.rise_ceiling_guard_would_block ?: org.json.JSONObject.NULL)
             base.put("rise_ceiling_guard_reason", baseline_state.rise_ceiling_guard_reason ?: org.json.JSONObject.NULL)
             base.put("rise_ceiling_guard_repeats", baseline_state.rise_ceiling_guard_repeats ?: org.json.JSONObject.NULL)
@@ -3927,6 +3941,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 estimatedRa = continuousStateEstimator.getLastRa().takeIf { it.isFinite() && it > 0.0 },
                 hoursSinceBolus = hoursSinceBolus,
                 lateFatProteinRise = lateFatRise,
+                riseLevel = currentRiseLevel(),
                 nowMs = nowMs,
             ),
         )
@@ -4896,6 +4911,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             endogenousCounterRegulatory = endogenousCounterRegulatory,
             mealAbsorptionPhase = lastMealAbsorptionOutput?.phase ?: MealAbsorptionPhase.NONE,
             mealModeActive = mealTime || bfastTime || lunchTime || dinnerTime || snackTime || highCarbTime,
+            riseLevel = currentRiseLevel(),
         )
         lastInsulinStackingEvaluation = stackingEval
         ensureWCycleInfo()
@@ -5342,7 +5358,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             }
             finalizeAndCapSMB(
                 rT = rT,
-                proposedUnits = liftedV3Smb,
+                proposedUnits = UndeclaredEvidenceCap.capSmb(liftedV3Smb, lastEvidenceLimits),
                 reasonHeader = htrReason,
                 mealData = ctx.mealData,
                 hypoThreshold = hypoThresholdMgdl,
@@ -5352,7 +5368,9 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 } else {
                     "AutodriveV3"
                 },
-                hyperReleaseFloorU = if (effectiveHtr.active) effectiveHtr.smbFloorU else 0.0,
+                hyperReleaseFloorU = if (effectiveHtr.active) {
+                    UndeclaredEvidenceCap.capSmb(effectiveHtr.smbFloorU, lastEvidenceLimits)
+                } else 0.0,
             )
         } else if (effectiveHtr.active) {
             consoleLog.add("🚀 HTR active but lifted SMB=0 (IOB/headroom); floor=${"%.2f".format(effectiveHtr.smbFloorU)}U")
@@ -5884,7 +5902,9 @@ class DetermineBasalaimiSMB2 @Inject constructor(
         }
         val hasRecentMealEstimate = recentEstimateCarbs > 10.0 && estimateAgeMinutes in 0.0..45.0
 
+        val riseConfirmation = RiseConfirmation.evaluate(recentCleanBgNewestFirst(RiseConfirmation.SLOW_WINDOW_TICKS + 1))
         val gate = autodriveGater.shouldEngageV3(
+            riseConfirmation = riseConfirmation,
             bg = ctx.glucoseStatus.glucose,
             combinedDelta = combinedDelta.toDouble(),
             cob = ctx.mealData.mealCOB,
@@ -5909,6 +5929,10 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             baseline.autodrive_gate_engaged = gate.engage
             baseline.autodrive_gate_kind = gate.kind.name
             baseline.autodrive_gate_reason = gate.reason
+            baseline.rise_confirmation_level = riseConfirmation?.level?.name
+            baseline.rise_confirmation_window_ticks = riseConfirmation?.windowTicks
+            baseline.rise_confirmation_positive_share = riseConfirmation?.positiveShare
+            baseline.rise_confirmation_net_mgdl = riseConfirmation?.netRiseMgdl
         }
 
         if (!gate.engage) {
@@ -6073,6 +6097,20 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             markHtrRaFloorForExport(lastHtrRaFloorMgdlPerMin, estimatedRaForMpc)
 
             val v3CommandSafe = adCommand != null && adCommand.isSafe
+            val evidenceLimits = UndeclaredEvidenceCap.limits(
+                undeclared = !autodriveMealSignals && !fclTime && !anticipTime && !autodriveMealContext.declaredMealIntent,
+                bgMgdl = bg,
+                belief = lastMealAbsorptionOutput?.belief,
+                riseLevel = riseConfirmation?.level,
+            )
+            pendingDecisionCtxForExport?.baseline_state?.evidence_cap_active = evidenceLimits.active
+            lastEvidenceLimits = evidenceLimits
+            if (evidenceLimits.active) {
+                consoleLog.add(
+                    "🧪 UNDECLARED_EVIDENCE_CAP: belief=${"%.2f".format(lastMealAbsorptionOutput?.belief ?: 0.0)} " +
+                        "basal<=${"%.1f".format(evidenceLimits.basalFactor)}x smb<=${"%.2f".format(evidenceLimits.smbCapU)}U"
+                )
+            }
             if (v3CommandSafe) {
                 val v3TbrRate = adCommand!!.temporaryBasalRate
                 if (v3TbrRate != null && v3TbrRate >= 0.0) {
@@ -6089,10 +6127,14 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                                 "${"%.2f".format(v3AdaptiveMult)}x at BG=${"%.0f".format(bg)}",
                         )
                     }
-                    val cappedV3Tbr = capBasalRateForCorrectionAggression(
-                        requestedRateUph = v3TbrRate,
+                    val cappedV3Tbr = UndeclaredEvidenceCap.capBasal(
+                        requestedUph = capBasalRateForCorrectionAggression(
+                            requestedRateUph = v3TbrRate,
+                            profileBasalUph = profile.current_basal,
+                            source = "AUTODRIVE_V3_DIRECT",
+                        ),
                         profileBasalUph = profile.current_basal,
-                        source = "AUTODRIVE_V3_DIRECT",
+                        limits = evidenceLimits,
                     )
                     setTempBasal(
                         cappedV3Tbr,
@@ -6104,6 +6146,11 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                         adaptiveMultiplier = v3AdaptiveMult,
                         mealContext = autodriveMealContext,
                     )
+                    // setTempBasal applies more multipliers after the cap, so the ceiling is enforced on the final rate.
+                    rT.rate?.let { finalRate ->
+                        val limited = UndeclaredEvidenceCap.capBasal(finalRate, profile.current_basal, evidenceLimits)
+                        if (limited < finalRate - 1e-6) rT.rate = limited
+                    }
                 }
             } else {
                 consoleLog.add("🧘 [AUTODRIVE V3] Command not safe — HTR may still lift SMB (${adCommand?.reason ?: "null"})")
@@ -6123,7 +6170,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             } else {
                 0.0
             }
-            val v3SmbRaw = maxOf(v3SmbModel, v3SmbFloor)
+            val v3SmbRaw = UndeclaredEvidenceCap.capSmb(maxOf(v3SmbModel, v3SmbFloor), evidenceLimits)
             // Only what the floor added on top of the model spends its budget.
             noteRiseFloorContribution(v3SmbRaw - v3SmbModel)
             val smallPrebolusPref = preferences.get(DoubleKey.OApsAIMIautodrivesmallPrebolus)
@@ -7736,6 +7783,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             endogenousCounterRegulatory = lastPhysiologicalPhaseOutput?.phase == PhysiologicalPhase.ENDOGENOUS_COUNTER_REGULATORY,
             mealAbsorptionPhase = lastMealAbsorptionOutput?.phase ?: MealAbsorptionPhase.NONE,
             mealModeActive = mealTime || bfastTime || lunchTime || dinnerTime || snackTime || highCarbTime,
+            riseLevel = currentRiseLevel(),
         )
         val suppressRedCarpetRestoreV3 = stackingEvalV3.suppressRedCarpetRestore
 
@@ -12167,6 +12215,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             endogenousCounterRegulatory = endogenousCounterRegulatory,
             mealAbsorptionPhase = lastMealAbsorptionOutput?.phase ?: MealAbsorptionPhase.NONE,
             mealModeActive = mealTime || bfastTime || lunchTime || dinnerTime || snackTime || highCarbTime,
+            riseLevel = currentRiseLevel(),
         )
         lastInsulinStackingEvaluation = stackingEval
         val refreshed = mergeRbtHyperTrajectoryRelease(
@@ -15161,6 +15210,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             endogenousCounterRegulatory = endogenousCounterRegulatory,
             mealAbsorptionPhase = mealAbsorption?.phase ?: MealAbsorptionPhase.NONE,
             mealModeActive = mealTime || bfastTime || lunchTime || dinnerTime || snackTime || highCarbTime,
+            riseLevel = currentRiseLevel(),
         )
         var iobSurveillanceSuppressRedCarpet = stackingEval.suppressRedCarpetRestore
 
@@ -17287,6 +17337,31 @@ class DetermineBasalaimiSMB2 @Inject constructor(
 
     private fun FloatArray.toDoubleArray(): DoubleArray {
         return this.map { it.toDouble() }.toDoubleArray()
+    }
+
+    /**
+     * Glucose values newest first, one per 5 min. It stops at the first gap or filled value, so a
+     * short result means the history is not clean enough to confirm a rise.
+     */
+    private var lastEvidenceLimits: UndeclaredEvidenceCap.Limits = UndeclaredEvidenceCap.NO_LIMIT
+
+    private fun currentRiseLevel(): RiseConfirmation.Level? =
+        if (fclTime || anticipTime || mealTime || bfastTime || lunchTime || dinnerTime || snackTime || highCarbTime) {
+            null
+        } else RiseConfirmation.evaluate(recentCleanBgNewestFirst(RiseConfirmation.SLOW_WINDOW_TICKS + 1))?.level
+
+    private fun recentCleanBgNewestFirst(count: Int): List<Double> {
+        val data = iobCobCalculator.ads.getBucketedDataTableCopy() ?: return emptyList()
+        val clean = ArrayList<Double>(count)
+        var previousTs = 0L
+        for (entry in data) {
+            if (entry.value <= 39 || entry.filledGap) break
+            if (clean.isNotEmpty() && abs(previousTs - entry.timestamp - 5 * 60_000L) > 90_000L) break
+            clean.add(entry.recalculated)
+            previousTs = entry.timestamp
+            if (clean.size >= count) break
+        }
+        return clean
     }
 
     private fun getRecentDeltas(): List<Double> {
