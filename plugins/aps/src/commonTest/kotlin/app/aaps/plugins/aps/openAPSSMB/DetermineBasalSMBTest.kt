@@ -298,20 +298,20 @@ class DetermineBasalSMBTest {
      */
     @Test
     fun `a 5_5 mmol temp target keeps SMB and 5_6 disables it`() {
-        assertThat(enableSmbWithTempTarget(5.5 * Constants.MMOLL_TO_MGDL)).isTrue()
-        assertThat(enableSmbWithTempTarget(5.6 * Constants.MMOLL_TO_MGDL)).isFalse()
+        assertTrue(enableSmbWithTempTarget(5.5 * Constants.MMOLL_TO_MGDL))
+        assertFalse(enableSmbWithTempTarget(5.6 * Constants.MMOLL_TO_MGDL))
     }
 
     /** A 5.5 mmol/L row stored by 3.4, with the 18.0 factor, reads 99.0 and must behave the same. */
     @Test
     fun `a temp target stored with the old factor behaves like the new one`() {
-        assertThat(enableSmbWithTempTarget(5.5 * 18.0)).isTrue()
-        assertThat(enableSmbWithTempTarget(5.6 * 18.0)).isFalse()
+        assertTrue(enableSmbWithTempTarget(5.5 * 18.0))
+        assertFalse(enableSmbWithTempTarget(5.6 * 18.0))
     }
 
     @Test
     fun `99 mg_dL keeps SMB and 100 disables it`() {
-        assertThat(enableSmbWithTempTarget(99.0)).isTrue()
-        assertThat(enableSmbWithTempTarget(100.0)).isFalse()
+        assertTrue(enableSmbWithTempTarget(99.0))
+        assertFalse(enableSmbWithTempTarget(100.0))
     }
 }

@@ -32,9 +32,11 @@
         <item quantity="one">a moment ago</item>
         <item quantity="other">%1$s minutes ago</item>
     </plurals>
+    <string name="forever">Forever</string>
     <string name="seconds_ago">seconds ago</string>
     <string name="in_days">in %1$.0f days</string>
     <string name="in_days_round">in %1$.0f days</string>
+    <string name="shortday">d</string>
     <string name="shorthour">h</string>
     <string name="days">days</string>
     <string name="hours">hours</string>

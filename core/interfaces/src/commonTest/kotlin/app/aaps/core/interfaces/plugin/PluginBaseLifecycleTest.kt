@@ -71,7 +71,6 @@ class PluginBaseLifecycleTest {
         override fun gs(ref: TextRef): String = text(ref)
         override fun gs(ref: TextRef, vararg args: Any?): String = text(ref)
         override fun gsNotLocalised(ref: TextRef): String = text(ref)
-        override fun shortTextMode(): Boolean = false
 
         private fun text(ref: TextRef): String = when (ref) {
             is TextRef.Literal    -> ref.text

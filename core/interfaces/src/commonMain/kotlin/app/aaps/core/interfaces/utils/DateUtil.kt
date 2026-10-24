@@ -1,6 +1,10 @@
 package app.aaps.core.interfaces.utils
 
+import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.resources.TextResolver
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The Class DateUtil. A modern utility class for handling dates, times, and durations using the `java.time` API.
@@ -499,4 +503,29 @@ interface DateUtil {
      * @return The new, updated timestamp in milliseconds.
      */
     fun mergeHourMinuteToTimestamp(timestamp: Long, hour: Int, minute: Int, randomSecond: Boolean = false): Long
+
+    /**
+     * Converts a duration in milliseconds into a human-readable "age" string (e.g., "5 days 3 hours").
+     * Upstream dropped this function. The old Android views and the Dexcom ONE+ status screen of this fork
+     * still use it, so it stays here with a default body.
+     * @param milliseconds The duration to format.
+     * @param useShortText If true, uses abbreviated units (e.g., "d", "h"). If false, uses full names (e.g., "days", "hours").
+     * @param rh Resource helper to get localized unit strings.
+     * @return The formatted age string.
+     */
+    fun age(milliseconds: Long, useShortText: Boolean, rh: TextResolver): String {
+        val duration = milliseconds.milliseconds
+        if (duration.inWholeDays > 1000) return rh.gs(InterfacesStrings.forever)
+        val daysUnit = if (useShortText) rh.gs(InterfacesStrings.shortday) else rh.gs(InterfacesStrings.days)
+        val hoursUnit = if (useShortText) rh.gs(InterfacesStrings.shorthour) else rh.gs(InterfacesStrings.hours)
+        val minutesUnit = if (useShortText) rh.gs(InterfacesStrings.shortminute) else rh.gs(InterfacesStrings.unit_minutes)
+        val days = duration.inWholeDays
+        val hours = (duration - days.days).inWholeHours
+        val minutes = (duration - days.days - hours.hours).inWholeMinutes
+        return when {
+            days > 0  -> "$days $daysUnit $hours $hoursUnit "
+            hours > 0 -> "$hours $hoursUnit $minutes $minutesUnit "
+            else      -> "${duration.inWholeMinutes} $minutesUnit"
+        }
+    }
 }

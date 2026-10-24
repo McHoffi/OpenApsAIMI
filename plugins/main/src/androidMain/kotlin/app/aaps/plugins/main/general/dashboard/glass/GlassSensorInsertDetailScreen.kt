@@ -50,6 +50,7 @@ import app.aaps.core.ui.compose.siteRotation.SiteLocationSummary
 import app.aaps.ui.compose.EventDatePicker
 import app.aaps.ui.compose.EventTimePicker
 import app.aaps.ui.compose.careDialog.CareDialogViewModel
+import app.aaps.ui.compose.careDialog.eventTimeChanged
 import app.aaps.ui.compose.careDialog.showNotesSection
 import app.aaps.ui.compose.careDialog.showSiteRotationSection
 import app.aaps.core.ui.R as CoreUiR

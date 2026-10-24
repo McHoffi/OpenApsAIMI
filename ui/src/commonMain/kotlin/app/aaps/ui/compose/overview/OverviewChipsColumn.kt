@@ -1,9 +1,12 @@
 package app.aaps.ui.compose.overview
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +41,8 @@ fun OverviewChipsColumn(
     // The command chips (running mode / profile / temp target) open mutating screens — their click is disabled on an
     // unpaired client (same MASTER_OR_PAIRED_CLIENT gate as nav/Manage), while the chip stays visible as status.
     commandsAllowed: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    trailingContent: @Composable (RowScope.() -> Unit)? = null
 ) {
     Column(
         modifier = modifier,

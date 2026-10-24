@@ -443,7 +443,7 @@ private fun TirRing(tir: GlassTir?, trackColor: Color, modifier: Modifier = Modi
 @Composable
 private fun TirTrendText(tir: GlassTir?, neutralColor: Color, modifier: Modifier = Modifier) {
     val delta = tir?.deltaVsYesterday
-    val percent = tir?.let { stringResource(CoreUiR.string.format_percent, it.inRangePct.roundToInt()) }
+    val percent = tir?.let { stringResource(CoreUiR.string.units_format_percent, it.inRangePct.roundToInt()) }
     val text = when {
         percent == null             -> stringResource(R.string.dashboard_glass_tir_empty)
         delta == null || delta == 0 -> stringResource(R.string.dashboard_glass_tir_value, percent)

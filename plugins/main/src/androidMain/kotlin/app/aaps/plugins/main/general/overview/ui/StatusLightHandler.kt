@@ -108,9 +108,9 @@ class StatusLightHandler @Inject constructor(
         withContext(Dispatchers.Main) {
             if (therapyEvent != null) {
                 warnColors.setColorByAge(view, therapyEvent, warn, urgent)
-                view?.text = therapyEvent.age(rh.shortTextMode(), rh, dateUtil)
+                view?.text = therapyEvent.age(!rh.gb(app.aaps.core.ui.R.bool.isTablet), rh, dateUtil)
             } else {
-                view?.text = if (rh.shortTextMode()) "-" else rh.gs(app.aaps.core.ui.R.string.value_unavailable_short)
+                view?.text = if (!rh.gb(app.aaps.core.ui.R.bool.isTablet)) "-" else rh.gs(app.aaps.core.ui.R.string.value_unavailable_short)
             }
         }
     }
