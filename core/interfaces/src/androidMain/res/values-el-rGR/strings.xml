@@ -91,4 +91,5 @@
     <string name="bolus_recorded_only">Το Bolus μόνο θα καταγραφεί (δε θα χορηγηθεί από την αντλία)</string>
     <string name="advisoralarm">Εκτέλεση συναγερμού όταν έρθει η ώρα να φάτε</string>
     <string name="format_insulin_units">%1$.2f U</string>
+    <string name="shortday">ημ</string>
 </resources>

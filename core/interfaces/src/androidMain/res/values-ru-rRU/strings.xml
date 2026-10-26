@@ -145,4 +145,6 @@
     <string name="bolus_recorded_only">Болюс будет только записан (без подачи помпой)</string>
     <string name="advisoralarm">Напомнить о еде</string>
     <string name="format_insulin_units">%1$.2f ед</string>
+    <string name="shortday">д</string>
+    <string name="forever">Навсегда</string>
 </resources>

@@ -60,4 +60,5 @@
     <!-- Insulin -->
     <!-- Concentration -->
     <string name="format_insulin_units">%1$.2f од</string>
+    <string name="shortday">дн</string>
 </resources>

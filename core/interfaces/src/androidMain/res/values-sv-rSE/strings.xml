@@ -88,4 +88,5 @@
     <string name="bolus_recorded_only">Bolus kommer bara att loggas (inte levereras av pumpen)</string>
     <string name="advisoralarm">Larma när det är dags att äta</string>
     <string name="format_insulin_units">%1$.2fU</string>
+    <string name="shortday">d</string>
 </resources>

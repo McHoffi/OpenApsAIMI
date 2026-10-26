@@ -73,4 +73,5 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="setupwizard_pair_with_master_info">将此客户端与您的主机 AAPS 配对，使其能够通过安全通道发送命令。</string>
 </resources>

@@ -73,4 +73,5 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="setupwizard_pair_with_master_info">Susiekite šį klientą su pagrindiniu AAPS įrenginiu, kad jis galėtų saugiu kanalu siųsti komandas.</string>
 </resources>

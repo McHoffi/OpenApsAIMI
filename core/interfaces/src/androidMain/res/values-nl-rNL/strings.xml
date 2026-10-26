@@ -154,4 +154,6 @@
     <string name="format_insulin_units">%1$.2f E</string>
     <string name="plugin_start_failed" comment="%1$s=plugin name, for example &quot;Dana-i/RS&quot;. Shown when a plugin threw while starting. It stays switched on, but it may not work.">Plugin %1$s kon niet worden gestart en werkt mogelijk niet. Start AAPS opnieuw op.</string>
     <string name="plugin_work_failed" comment="%1$s=plugin name, for example &quot;Dana-i/RS&quot;. Shown when background work the plugin started ended with an error. The plugin is still switched on, but part of it has stopped.">Er is een fout opgetreden in plugin %1$s en een deel ervan is gestopt. Start AAPS opnieuw op.</string>
+    <string name="shortday">d</string>
+    <string name="forever">Voor altijd</string>
 </resources>

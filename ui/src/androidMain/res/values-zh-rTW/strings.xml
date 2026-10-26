@@ -360,4 +360,6 @@ Check the active state.</string>
     <string name="cal_precheck_delta_too_high">血糖變化過快（Δ 每 5 分鐘 %1$s %3$s，限制 %2$s）。請等待穩定。</string>
     <string name="cal_precheck_mark_sensor_change">標記傳感器更換</string>
     <string name="graph_therapy_event_bg_with_note" comment="Shown when the user taps a BG check in the overview graph. %1$s = glucose with its unit, %2$s = the note the user wrote. Example: 6.1 mmol/L, before lunch">%1$s, %2$s</string>
+    <string name="activity_monitor">活動監視器</string>
+    <string name="time_range">時間範圍</string>
 </resources>

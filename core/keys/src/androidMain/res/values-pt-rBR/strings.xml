@@ -377,4 +377,5 @@
     <string name="lgs_threshold_summary">Valor a partir do qual a insulina é suspensa. O valor padrão usa como base o alvo padrão. O usuário pode definir o valor entre 60mg/dl (3.3mmol/l) e 100mg/dl(5.5 mmol/l). Valores abaixo de 65/3.6 resulta em uso do modelo padrão.</string>
     <!-- IntentKey preferences -->
     <!--    Appearance preferences-->
+    <string name="pref_summary_ns_allow_client_control">Permitir que dispositivos clientes pareados enviem comandos assinados (por exemplo, iniciar/parar cenários) pelo Nightscout.</string>
 </resources>

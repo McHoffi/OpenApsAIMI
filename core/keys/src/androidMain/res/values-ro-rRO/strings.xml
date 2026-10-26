@@ -379,4 +379,5 @@
     <string name="lgs_threshold_summary">Valoarea glicemiei sub care administrarea insulinei este suspendată. Valoarea implicită folosește modelul standard de țintă. Utilizatorul poate seta valoarea între 60mg/dl (3,3mmol/l) și 100 mg/dl (5,5mmol/l). Valorile sub 65/3,6 determină utilizarea modelului standard</string>
     <!-- IntentKey preferences -->
     <!--    Appearance preferences-->
+    <string name="pref_summary_ns_allow_client_control">Permite clienților să trimită comenzi semnate (spre exemplu start/stop scenarii) prin Nightscout.</string>
 </resources>

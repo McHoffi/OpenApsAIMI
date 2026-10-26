@@ -70,4 +70,5 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="setupwizard_pair_with_master_info">Pareie este cliente com seu AAPS no dispositivo principal para que ele possa enviar comandos por um canal seguro.</string>
 </resources>

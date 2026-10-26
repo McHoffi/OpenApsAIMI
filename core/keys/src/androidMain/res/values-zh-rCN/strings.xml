@@ -379,4 +379,5 @@
     <string name="lgs_threshold_summary">血糖值低于此值时，胰岛素暂停使用。默认值使用标准目标模型。用户可以在 60mg/dl (3.3mmol/l) 和 100mg/dl (5.5mmol/l) 之间设置。低于 65/3.6 的值将使用默认模型</string>
     <!-- IntentKey preferences -->
     <!--    Appearance preferences-->
+    <string name="pref_summary_ns_allow_client_control">允许已配对的客户端设备通过 Nightscout 发送已签名的命令（例如启动/停止情景模式）。</string>
 </resources>

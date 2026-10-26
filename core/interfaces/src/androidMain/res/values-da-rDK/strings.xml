@@ -92,4 +92,5 @@
     <string name="bolus_recorded_only">Bolus registreres kun (bliver ikke leveret af pumpe)</string>
     <string name="advisoralarm">Kør alarm når det er tid til at spise</string>
     <string name="format_insulin_units">%1$.2f IE</string>
+    <string name="shortday">d</string>
 </resources>

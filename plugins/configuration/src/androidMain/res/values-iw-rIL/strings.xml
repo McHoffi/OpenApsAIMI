@@ -72,4 +72,5 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="setupwizard_pair_with_master_info">צמדו מכשיר עוקב זה ל־AAPS הראשי שלכם כדי שיוכל לשלוח פקודות בערוץ מאובטח.</string>
 </resources>

@@ -71,4 +71,5 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="setupwizard_pair_with_master_info">Asociați acest client cu AAPS principal astfel încât să poată trimite comenzi pe un canal securizat.</string>
 </resources>

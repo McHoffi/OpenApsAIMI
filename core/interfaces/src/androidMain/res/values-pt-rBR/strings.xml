@@ -131,4 +131,5 @@
     <string name="bolus_constraint_applied_warn">Restrição de bólus aplicada: %1$.2f U para %2$.2f U</string>
     <string name="bolus_recorded_only">Bolus será apenas registrado (não administrado pela bomba)</string>
     <string name="advisoralarm">Disparar alarme quando for a hora de comer</string>
+    <string name="forever">Para sempre</string>
 </resources>

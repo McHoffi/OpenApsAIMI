@@ -92,4 +92,5 @@
     <string name="bolus_recorded_only">Bolus wird nur aufgezeichnet (Die Pumpe gibt kein Insulin ab!)</string>
     <string name="advisoralarm">Alarmiere mich, wenn es Zeit zum Essen ist. </string>
     <string name="format_insulin_units">%1$.2f IE</string>
+    <string name="shortday">d</string>
 </resources>

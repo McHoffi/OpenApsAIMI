@@ -356,4 +356,6 @@
     <string name="cal_precheck_delta_too_high">Glukosen endrer seg for raskt (Δ %1$s %3$s per 5 min, grense %2$s). Vent til den er stabil.</string>
     <string name="cal_precheck_mark_sensor_change">Registrer sensorbytte</string>
     <string name="graph_therapy_event_bg_with_note" comment="Shown when the user taps a BG check in the overview graph. %1$s = glucose with its unit, %2$s = the note the user wrote. Example: 6.1 mmol/L, before lunch">%1$s, %2$s</string>
+    <string name="activity_monitor">Aktivitetsmonitor</string>
+    <string name="time_range">Tidsrom</string>
 </resources>

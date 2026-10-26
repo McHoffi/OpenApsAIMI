@@ -63,4 +63,5 @@
     <string name="profile_carbs_per_unit">g/E</string>
     <string name="bolus">Bólus</string>
     <string name="format_insulin_units">%1$.2f E</string>
+    <string name="shortday">n</string>
 </resources>

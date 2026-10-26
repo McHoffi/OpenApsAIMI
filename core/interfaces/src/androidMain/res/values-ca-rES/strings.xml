@@ -63,4 +63,5 @@
     <string name="basal_value">Valor basal</string>
     <string name="cobvsiob">COB vs IOB</string>
     <string name="advisoralarm">Executar alarma quan sigui hora de menjar</string>
+    <string name="shortday">d</string>
 </resources>

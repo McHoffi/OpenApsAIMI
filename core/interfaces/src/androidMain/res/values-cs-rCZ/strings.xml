@@ -170,4 +170,6 @@
     <string name="carbs_with_time_later" comment="Carbs eaten later. %1$s=carbs with unit, %2$s=minutes from now, with unit. Example: 20 g (+15 min)">%1$s (+%2$s)</string>
     <string name="plugin_start_failed" comment="%1$s=plugin name, for example &quot;Dana-i/RS&quot;. Shown when a plugin threw while starting. It stays switched on, but it may not work.">Plugin %1$s se nepodařilo spustit a nemusí fungovat. Prosím restartujte AAPS.</string>
     <string name="plugin_work_failed" comment="%1$s=plugin name, for example &quot;Dana-i/RS&quot;. Shown when background work the plugin started ended with an error. The plugin is still switched on, but part of it has stopped.">U pluginu %1$s došlo k chybě a jeho část byla zastavena. Prosím restartujte AAPS.</string>
+    <string name="shortday">d</string>
+    <string name="forever">Navždy</string>
 </resources>

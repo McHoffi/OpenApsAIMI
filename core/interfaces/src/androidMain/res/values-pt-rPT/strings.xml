@@ -88,4 +88,5 @@
     <string name="cobvsiob">HCA vs IA</string>
     <string name="advisoralarm">Executar alarme quando for tempo de comer</string>
     <string name="format_insulin_units">%1$.2f U</string>
+    <string name="shortday">d</string>
 </resources>
