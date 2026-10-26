@@ -76,4 +76,36 @@
     <string name="lgs_threshold_summary">Der BG-Wert, unter dem die Insulinzuführung ausgesetzt wird. Der Standardwert verwendet das Standard-Zielmodell. Der Benutzer kann einen Wert zwischen 60mg/dl (3.3 mmol/l) und 100mg/dl (5.5mmol/l) setzen. Werte unterhalb 65/3.6 führen zur Verwendung des Standardmodells</string>
     <!-- IntentKey preferences -->
     <!--    Appearance preferences-->
+    <string name="pref_title_units">Einheiten</string>
+    <string name="pref_title_language">Sprache</string>
+    <string name="pref_title_simple_mode">Einfacher Modus</string>
+    <string name="pref_title_low_end_stability_mode">Stabilitätsmodus für schwache Geräte</string>
+    <string name="pref_title_insulin_concentration">Unterstützung für Insulinkonzentrationen</string>
+    <string name="pref_summary_insulin_concentration">Unterstützung für andere Insulinkonzentrationen aktivieren (U50, U200 usw.)</string>
+    <string name="pref_title_keep_screen_on">Bildschirm eingeschaltet lassen</string>
+    <string name="pref_summary_keep_screen_on">Verhindert, dass Android den Bildschirm ausschaltet. Das braucht viel Energie, wenn das Gerät nicht am Strom hängt.</string>
+    <string name="pref_title_patient_name">Name der Instanz</string>
+    <string name="pref_summary_patient_name">Name der Person, die dieses Telefon nutzt. Er unterscheidet diese AAPS-Instanz in Berichten und bei der Synchronisation.</string>
+    <string name="lang_default">Systemstandard</string>
+    <string name="pref_title_skin">Übersichtslayout</string>
+    <string name="pref_title_overview_glass_look">Glas-Optik für die Übersicht</string>
+    <string name="pref_title_low_mark">Untere BZ-Grenze</string>
+    <string name="pref_title_high_mark">Obere BZ-Grenze</string>
+    <string name="prefs_vico_chart_appearance_title">Aussehen der Startgrafik (Vico)</string>
+    <string name="pref_title_vico_bg_reading_tint">Farbe der BZ-Punkte</string>
+    <string name="pref_summary_vico_bg_reading_tint">Farbe für einzelne CGM-Punkte in der Hauptgrafik. Punkte, die nach Bereich eingefärbt sind, bleiben gleich.</string>
+    <string name="pref_vico_tint_mauve">Malve</string>
+    <string name="pref_vico_tint_ocean">Ozean</string>
+    <string name="pref_vico_tint_theme">Standard des Themes</string>
+    <string name="pref_title_vico_chart_backdrop">Hintergrundstil der Grafik</string>
+    <string name="pref_summary_vico_chart_backdrop">Farbverlauf hinter der Glukosegrafik in Dashboard und Übersicht.</string>
+    <string name="pref_vico_backdrop_deep">Dunkel</string>
+    <string name="pref_vico_backdrop_theme">Standard des Themes</string>
+    <string name="pref_vico_backdrop_warm">Warm</string>
+    <string name="pref_title_show_notes_in_dialogs">Notizen in Dialogen anzeigen</string>
+    <string name="pref_title_app_color_scheme">Farbschema der App</string>
+    <string name="pref_summary_theme_switcher">Dunkel, hell oder dem System folgen</string>
+    <string name="pref_dark_theme">Dunkles Theme</string>
+    <string name="pref_light_theme">Helles Theme</string>
+    <string name="pref_summary_overview_glass_look">Zeigt die Übersicht mit Glaskarten und einem Farbverlauf als Hintergrund. Das Skin „Glas-Dashboard“ ändert sich nicht.</string>
 </resources>
