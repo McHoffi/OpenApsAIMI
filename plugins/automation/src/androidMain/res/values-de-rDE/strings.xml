@@ -93,4 +93,5 @@
     <!--    Smoothing-->
     <!--    Map Picker (OpenStreetMap)-->
     <!-- Permission rationales -->
+    <string name="autotune_profile_name">Autotune Profil %1$s</string>
 </resources>

@@ -93,4 +93,20 @@
     <string name="advisoralarm">Alarmiere mich, wenn es Zeit zum Essen ist. </string>
     <string name="format_insulin_units">%1$.2f IE</string>
     <string name="shortday">d</string>
+    <string name="bolus_delivering">Gebe %1$.2f IE ab</string>
+    <string name="bolus_delivered_so_far">%1$.2f IE / %2$.2f IE abgegeben</string>
+    <string name="bolus_delivered_successfully">Bolus %1$.2f IE erfolgreich abgegeben</string>
+    <string name="minago">vor %1$d Min.</string>
+    <plurals name="hoursago">
+        <item quantity="one">Vor %1$d Stunde(n)</item>
+        <item quantity="other">Vor %1$d Stunden</item>
+    </plurals>
+    <string name="unknown">unbekannt</string>
+    <string name="rapid_acting_oref">Rapid-Acting Oref</string>
+    <string name="lyumjev">Lyumjev</string>
+    <string name="ultra_rapid_oref">Ultra-Rapid Oref</string>
+    <string name="pump_disconnected">Pumpe abgeschaltet</string>
+    <string name="basalprofilenotaligned">Basalraten beginnen nicht zur vollen Stunde: %1$s</string>
+    <string name="mins">%1$d min.</string>
+    <string name="profile_low_target">Profil unteres Ziel</string>
 </resources>

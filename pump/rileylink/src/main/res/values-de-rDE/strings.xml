@@ -60,4 +60,15 @@
     </plurals>
     <string name="orange_use_scanning_level">Verwende Scannen</string>
     <string name="orange_use_scanning_level_summary">Scanne, bevor Du mit dem OrangeLink verbindest. Das sollte die Stabilität der Verbindung verbessern und kann auch mit anderen RileyLink-Nachbauten probiert werden.</string>
+    <string name="pump_status_never_contacted">Noch nie verbunden</string>
+    <string name="pump_status_sleeping">Schlafen</string>
+    <string name="pump_status_waking_up">Aufwecken</string>
+    <string name="pump_status_active">Aktiv</string>
+    <string name="pump_status_error_comm">Fehler bei der Kommunikation</string>
+    <string name="pump_status_timeout_comm">Zeitüberschreitung bei Kommunikation</string>
+    <string name="pump_status_invalid_config">Ungültige Einstellung</string>
+    <string name="medtronic_pump_encoding_4b6b_local">Software 4b6b Codierung</string>
+    <string name="medtronic_pump_encoding_4b6b_rileylink">Hardware 4b6b Codierung</string>
+    <string name="medtronic_pump_frequency_us_ca">US &amp; Kanada (916 MHz)</string>
+    <string name="medtronic_pump_frequency_worldwide">Weltweit (868 Mhz)</string>
 </resources>

@@ -78,4 +78,9 @@
     <string name="string_resumed_insulin_delivery_message">Insulinabgabe wieder aufgenommen.</string>
     <string name="string_temp_basal_remained_hhmm">verbleibende Zeit: %1$s:%2$s</string>
     <string name="string_resume_failed">Fortsetzen fehlgeschlagen.</string>
+    <string name="patch_remove_needle_cap_desc_2">[Caution1] Wenn eine Nadel aussticht, tippe auf \'Verwerfung\'.</string>
+    <string name="patch_remove_needle_cap_desc_3">[Caution2] Wenn der Patch nass oder schmutzig ist oder sein Klebeband gefaltet ist, tippen Sie auf \'Verwerfung\'.</string>
+    <string name="patch_safety_check_desc_2">[Caution] Für den sicheren Gebrauch, entferne nicht den Nadel-Aktionshebel bis die Sicherheitsüberprüfung abgeschlossen ist!</string>
+    <string name="string_resume_insulin_delivery_message">Ende der Insulinaussetzung.\nTippe auf \'Bestätigen\', um die Insulinlieferung fortzusetzen.\n\n[Caution]\nInsulinlieferung wird nicht fortgesetzt, bis Sie auf \'Bestätigen\' tippen.\nWenn du nicht auf \'Bestätigen\' tippst, kannst du eine Hyperglykämie entwickeln.</string>
+    <string name="string_pause_failed">Unterbrechung fehlgeschlagen.</string>
 </resources>

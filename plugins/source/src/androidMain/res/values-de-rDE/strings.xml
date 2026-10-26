@@ -27,4 +27,10 @@
     <!-- Instara preferences -->
     <!-- Notification Reader -->
     <!-- Permission rationales -->
+    <string name="description_source_xdrip">Empfange Blutzuckerwerte von xDrip+.</string>
+    <string name="description_source_eversense">Empfange BZ-Werte von der gepatchten Eversense-App.</string>
+        <string name="eversense_cloud_upload_enabled">Eversense-Cloud-Upload aktivieren</string>
+        <string name="eversense_cloud_upload_toast">Ergebnis des Cloud-Uploads anzeigen</string>
+    <string name="aidex">GlucoRx Aidex</string>
+    <string name="description_source_aidex">Erhalte BG-Werte von GlucoRx Aidex CGMS.</string>
 </resources>

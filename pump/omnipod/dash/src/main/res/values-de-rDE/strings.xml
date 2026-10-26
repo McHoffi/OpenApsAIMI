@@ -28,4 +28,9 @@
     <string name="cancel_temp_basal_result_is_uncertain">Ob das Abbrechen der TBR erfolgreich war, ist unklar</string>
     <string name="unconfirmed_resumedelivery_command_please_refresh_pod_status">Unbestätigter Insulinabgabe fortsetzen Befehl. Bitte Pod Status aktualisieren</string>
     <string name="cancelling_temp_basal_might_have_failed">Das Abbrechen der TBR war ggf. fehlerhaft. Falls zuvor eine andere TBR aktiv war, wurde diese evtl. abgebrochen. Aktualisiere bitte manuell den Pod Status im DASH Tab.</string>
+    <string name="omnipod_dash_overview_firmware_version_value">Firmware %1$s / Bluetooth %2$s</string>
+    <string name="omnipod_dash_failed_to_connect">Verbindung mit Pod fehlgeschlagen</string>
+    <string name="omnipod_dash_found_too_many_pods">Zu viele Pods für die Aktivierung gefunden</string>
+    <string name="omnipod_dash_scan_failed">Konnte keinen verfügbaren Pod für die Aktivierung finden</string>
+    <string name="omnipod_dash_connection_lost">Verbindung zum Pod verloren</string>
 </resources>

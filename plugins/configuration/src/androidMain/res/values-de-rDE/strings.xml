@@ -53,4 +53,17 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <string name="permission">Berechtigung</string>
+    <string name="need_system_window_permission">Die App benötigt die Systemberechtigung für App-Benachrichtigungen</string>
+    <string name="need_location_permission">Die App benötigt die Berechtigung für den Standort, um Bluetooth und WLAN nutzen zu können</string>
+    <string name="need_storage_permission">Die App benötigt Zugriffsrechte für den Speicher um Log-Dateien zu sichern und die Einstellungen zu exportieren.</string>
+    <string name="need_whitelisting">%1$s benötigt eine deaktivierte Akku-Leistungsoptimierung, um korrekt arbeiten zu können.</string>
+    <string name="error_asking_for_permissions">Fehler beim Anfordern der Erlaubnis</string>
+    <string name="import_setting">Einstellungen importieren</string>
+    <string name="aaps_directory">AAPS-Verzeichnis</string>
+    <string name="askforpermission">Nach Berechtigung fragen</string>
+    <string name="setupwizard_aps_description">Wähle einen der verfügbaren Algorithmen aus. Sie sind vom Ältesten zum Neuesten sortiert. Neuere Algorithmen sind meist stärker und aggressiver. Wenn du ein Anfänger bist, solltest du nicht mit dem Neuesten sondern mit AMA starten. Vergiss nicht, die OpenAPS-Dokumentation zu lesen und die entsprechenden Einstellungen vor der Benutzung vorzunehmen.</string>
+    <string name="configbuilder_sync_description">Daten-Upload und -Synchronisierungs-Plugins.</string>
+    <string name="loading">Wird geladen…</string>
+    <string name="authorization_status">Autorisierungsstatus</string>
 </resources>

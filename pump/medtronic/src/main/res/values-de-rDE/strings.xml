@@ -75,4 +75,5 @@
     <string name="invalid_history_data">Ungültige Pumpenhistorie erkannt. Eröffne ein neues Ticket (issue) und füge Logs bei.</string>
     <string name="riley_statistics">RL Statistik</string>
     <string name="clicked_refresh" comment="26 characters max for translation">Aktualisieren geklickt</string>
+    <string name="medtronic_custom_action_reset_rileylink">RileyLink-Konfiguration zurücksetzen</string>
 </resources>

@@ -39,4 +39,7 @@
     <string name="metadata_label_encryption">Dateiverschlüsselung</string>
     <string name="metadata_format_new">Neues verschlüsseltes Format</string>
     <string name="metadata_format_other">Unbekanntes Export-Format</string>
+    <string name="short_status_battery">Batt.: %1$d%%</string>
+    <string name="exported_ago" comment="at placeholder we add pluralized number of hours/minutes">Vor %1$s Tagen exportiert</string>
+    <string name="metadata_label_format">Dateiformat</string>
 </resources>

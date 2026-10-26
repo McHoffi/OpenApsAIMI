@@ -39,4 +39,6 @@
     <string name="doyouwantresetstart">Möchtest Du den Start der Ziele zurücksetzen? Du verlierst Deine Fortschritte.</string>
     <string name="objectives_button_unfinish">Ziel erneut öffnen</string>
     <string name="objectives_button_unstart">Ziel neu starten</string>
+    <string name="version_expire">Version %1$s läuft am %2$s ab</string>
+    <string name="safety">Sicherheit</string>
 </resources>

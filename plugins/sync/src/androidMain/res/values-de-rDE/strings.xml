@@ -174,4 +174,12 @@
     <string name="sms_profile_switch_created">Profilwechsel wurde erstellt</string>
     <string name="sms_wrong_tbr_duration">Die TBR-Dauer muss ein Vielfaches von %1$d Minuten und größer als 0 sein.</string>
     <string name="a11y_otp_qr_code">QR Code für einmaliges Passwort einrichten</string>
+    <string name="description_ns_client">Synchronisiert deine Daten mit Nightscout</string>
+    <string name="description_ns_client_v3">Synchronisiert deine Daten mit Nightscout</string>
+    <string name="no_write_permission">Nightscout-Client hat keine Schreibrechte. Falscher API-Key?</string>
+    <string name="restart">Neustart</string>
+    <string name="summary_tidepool_dev_servers">Wenn diese Option aktiviert ist, werden die Uploads an https://int-app.tidepool.org statt an die reguläre https://app.tidepool.org/ weitergeleitet</string>
+    <string name="wear_import_custom_watchface_title">Eigene Watchface auswählen</string>
+    <string name="smscommunicator_bolus_failed">Bolus fehlgeschlagen</string>
+    <string name="smscommunicator_current_loop_mode">Aktueller Loop Modus: %1$s</string>
 </resources>

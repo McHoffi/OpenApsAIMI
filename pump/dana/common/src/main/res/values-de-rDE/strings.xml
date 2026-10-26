@@ -97,4 +97,6 @@
     <string name="num1pin">1: (12 Zeichen)</string>
     <string name="num2pin">2: (8 Zeichen)</string>
     <string name="basal_bolus_step">Basal/Bolus Schrittgröße</string>
+    <string name="largetimedifftitle">Große Zeitdifferenz</string>
+    <string name="danar_useextended_title">Benutze verzögerten Bolus für hohe TBR &gt;200%%</string>
 </resources>

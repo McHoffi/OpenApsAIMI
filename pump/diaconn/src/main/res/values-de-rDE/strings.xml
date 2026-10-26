@@ -120,4 +120,8 @@
     <string name="diaconn_g8_errorcode_36">TBR kann nicht gestoppt werden, da keine TBR läuft.</string>
     <string name="diaconn_g8_cloudsend_summary">Sende Pumpenprotokolle zur Diaconn Cloud.</string>
     <string name="diaconn_g8_cloudsend_title">Diaconn Cloud-Sync</string>
+    <string name="resetpairing">Pairing zurücksetzen?</string>
+    <string name="largetimedifftitle">Große Zeitdifferenz</string>
+    <string name="gettingbolusstatus">Status des Bolus wird ermittelt</string>
+    <string name="processinghistory">Ereignis wird verarbeitet</string>
 </resources>

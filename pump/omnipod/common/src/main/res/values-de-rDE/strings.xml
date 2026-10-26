@@ -153,4 +153,16 @@
     <!-- Omnipod - History -->
     <string name="omnipod_common_history_bolus_value">%1$.2f IE</string>
     <string name="omnipod_common_history_total_delivered">Gesamt geliefert: %1$.2f E</string>
+    <string name="omnipod_common_overview_pod_status">Pod Status</string>
+    <string name="omnipod_common_preferences_notification_uncertain_smb_sound_enabled">Ton für unsichere SMB-Benachrichtigungen aktiviert</string>
+    <string name="omnipod_common_preferences_notification_delivery_suspended_sound_enabled">Ton bei unterbrochener Abgabe aktiviert</string>
+    <string name="omnipod_common_cmd_set_tbr">Setze Temporäre Basalrate</string>
+    <string name="omnipod_common_cmd_cancel_tbr_by_driver">Temporäre Basalrate abbrechen (intern über den Treiber)</string>
+    <string name="omnipod_common_cmd_cancel_tbr">Temp. Basalrate abbrechen</string>
+    <string name="omnipod_common_cmd_set_fake_suspended_tbr">Fake TBR gesetzt, da der Pod pausiert ist.</string>
+    <string name="omnipod_common_cmd_cancel_fake_suspended_tbr">Abbruch der Fake TBR. Diese wurde eingestellt, da der Pod pausiert war.</string>
+    <string name="omnipod_common_cmd_split_tbr">Temp. Basalrate wegen unbekanntem Fehler bei TBR-Abbruch aufgeteilt</string>
+    <string name="omnipod_common_alert_finish_pairing_reminder">Erinnerung Kopplung beendet</string>
+    <string name="omnipod_common_alert_finish_setup_reminder_reminder">Erinnerung Setup beendet</string>
+    <string name="omnipod_common_history_tbr_value">%1$.2f U/h, %2$d Minuten</string>
 </resources>

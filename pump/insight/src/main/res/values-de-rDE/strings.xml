@@ -42,4 +42,10 @@
     <string name="max_recovery_duration">Max. Erholungsdauer [s]</string>
     <string name="min_recovery_duration">Min. Erholungsdauer [s]</string>
     <string name="pump_alert">Pumpenalarm</string>
+    <string name="insight_status">Status</string>
+    <string name="tdd_bolus">TDD Bolus</string>
+    <string name="tdd_basal">TDD Basal</string>
+    <string name="insight_local">Accu-Chek Insight</string>
+    <string name="insight_alert_formatter">%1$s: %2$s</string>
+    <string name="reservoir_level"> %.2f IE</string>
 </resources>

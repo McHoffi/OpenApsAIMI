@@ -155,4 +155,21 @@
     <string name="hour_minute">%1$s:%2$s</string>
     <string name="hour_minute_second">%1$s:%2$s:%3$s</string>
     <string name="pref_heartRateSampling">Herzfrequenz</string>
+    <string name="label_actions_tile">AAPS(Aktionen)</string>
+    <string name="label_temp_target_tile">AAPS(Temp Target)</string>
+    <string name="label_quick_wizard_tile">AAPS(Quick Wizard)</string>
+    <string name="action_percentage">Prozentsatz</string>
+    <string name="digitalstyle_pref_your_style">Ihr Stil:</string>
+    <string name="digitalstyle_pref_your_color">Ihre Farbe:</string>
+    <string name="digitalstyle_pref_your_color_saturation">Ihre Farbsättigung:</string>
+    <string name="digitalstyle_pref_your_color_opacity">Deine Farbtransparenz:</string>
+    <string name="error">Fehler</string>
+    <string name="loop_status_closed">CLOSED LOOP</string>
+    <string name="loop_status_open">OPEN LOOP</string>
+    <string name="loop_status_disabled">LOOP DEAKTIVIERT</string>
+    <string name="loop_status">Loop Status</string>
+    <string name="confirm">Bestätigen</string>
+    <string name="request">Anfordern</string>
+    <string name="constraint_applied">Beschränkung angewendet!</string>
+    <string name="wizard_calculation">Berechnung</string>
 </resources>

@@ -2,4 +2,11 @@
 <resources>
     <string name="authorizationfailed">Autorisierung fehlgeschlagen</string>
     <string name="identification_not_set">Identifikation im Dev-Modus nicht gesetzt</string>
+    <string name="nav_exit">Schließen</string>
+    <string name="delta">Delta</string>
+    <string name="save">Speichern</string>
+    <string name="wear">Wear</string>
+    <string name="invalid">Ungültig</string>
+    <string name="set">Setzen</string>
+    <string name="initializing">Initialisierung…</string>
 </resources>
