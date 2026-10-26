@@ -140,36 +140,50 @@ class FileListProviderImpl(
     private fun metadataFor(contents: String): PrefMetadataMap =
         checkMetadata(encryptedPrefsFormat.loadMetadata(contents))
 
+    /**
+     * Finds the sub folder, or creates it when it is really missing.
+     * `findFile` asks the provider for this one name. Creating only after that check keeps the
+     * provider from making "extra (1)", "extra (2)" ... on every call.
+     */
+    private fun DocumentFile.subDirectory(name: String): DocumentFile? =
+        findFile(name)?.takeIf { it.isDirectory } ?: createDirectory(name)
+
     override fun ensurePreferenceDirExists(): DocumentFile? {
         val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
         val uri = Uri.parse(prefUri)
         val baseDir = DocumentFile.fromTreeUri(context, uri)
-        val files = baseDir?.listFiles()
-        return files?.firstOrNull { it.name == preferencesPath } ?: baseDir?.createDirectory(preferencesPath)
+        return baseDir?.subDirectory(preferencesPath)
     }
 
     override fun ensureExportDirExists(): DocumentFile? {
         val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
         val uri = prefUri.toUri()
         val baseDir = DocumentFile.fromTreeUri(context, uri)
-        val files = baseDir?.listFiles()
-        return files?.firstOrNull { it.name == exportsPath } ?: baseDir?.createDirectory(exportsPath)
+        return baseDir?.subDirectory(exportsPath)
     }
 
     override fun ensureTempDirExists(): DocumentFile? {
         val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
         val uri = prefUri.toUri()
         val baseDir = DocumentFile.fromTreeUri(context, uri)
-        val files = baseDir?.listFiles()
-        return files?.firstOrNull { it.name == tempPath } ?: baseDir?.createDirectory(tempPath)
+        return baseDir?.subDirectory(tempPath)
     }
 
     override fun ensureExtraDirExists(): DocumentFile? {
         val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
         val uri = prefUri.toUri()
         val baseDir = DocumentFile.fromTreeUri(context, uri)
-        val files = baseDir?.listFiles()
-        return files?.firstOrNull { it.name == extraPath } ?: baseDir?.createDirectory(extraPath)
+        return baseDir?.subDirectory(extraPath)
+    }
+
+    /**
+     * Looks for `Documents/AAPS/extra/<name>` as a plain file.
+     * Needs "all files access". Some devices have no folder picker for internal storage, so the
+     * chosen folder cannot be set there. Returns null when this way is not available.
+     */
+    override fun extraFileExists(name: String): Boolean? {
+        if (!Environment.isExternalStorageManager()) return null
+        return runCatching { File(File(documentsPath, extraPath), name).isFile }.getOrNull()
     }
 
     override fun ensureResultDirExists(): File {

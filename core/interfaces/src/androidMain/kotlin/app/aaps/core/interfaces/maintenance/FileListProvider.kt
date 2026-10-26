@@ -12,6 +12,13 @@ interface FileListProvider : PrefsFileInfo {
     fun ensureTempDirExists(): DocumentFile?
     fun ensureExtraDirExists(): DocumentFile?
 
+    /**
+     * Does the plain file `Documents/AAPS/extra/<name>` exist?
+     * Returns null when this check is not possible (no "all files access"). The caller then asks
+     * the chosen folder instead.
+     */
+    fun extraFileExists(name: String): Boolean?
+
     fun newPreferenceFile(): DocumentFile?
     fun newExportCsvFile(): DocumentFile?
     fun newCwfFile(filename: String, withDate: Boolean = true): DocumentFile?

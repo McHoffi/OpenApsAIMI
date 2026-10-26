@@ -105,6 +105,8 @@ class ConfigImpl(
     override fun isEnabled(option: ExternalOptions): Boolean =
         option in externalOptionsOverride.enabled() ||
             enabledOptionsCache.getOrPut(option) {
-                fileListProvider().ensureExtraDirExists()?.findFile(option.filename) != null
+                // The plain file is checked first. On some devices the folder picker cannot choose internal storage.
+                fileListProvider().extraFileExists(option.filename) == true ||
+                    fileListProvider().ensureExtraDirExists()?.findFile(option.filename) != null
             }
 }
