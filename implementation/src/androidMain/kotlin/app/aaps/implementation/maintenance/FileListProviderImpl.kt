@@ -38,6 +38,7 @@ import org.joda.time.Hours
 import org.joda.time.LocalDateTime
 import org.joda.time.format.DateTimeFormat
 import java.io.File
+import kotlin.io.OnErrorAction
 import kotlin.math.abs
 
 @Suppress("SpellCheckingInspection")
@@ -64,9 +65,12 @@ class FileListProviderImpl(
     val tempPath = "temp"
     val extraPath = "extra"
 
+    @Volatile private var chosenFolderCopied = false
+
     companion object {
 
         private const val IMPORT_AGE_NOT_YET_OLD_DAYS = 60
+        private const val COPIED_MARKER = ".chosen_folder_copied"
     }
 
     /**
@@ -140,49 +144,87 @@ class FileListProviderImpl(
     private fun metadataFor(contents: String): PrefMetadataMap =
         checkMetadata(encryptedPrefsFormat.loadMetadata(contents))
 
+    override fun usesFixedFolder(): Boolean = Environment.isExternalStorageManager()
+
+    /**
+     * The folder that holds `preferences`, `exports`, `temp` and `extra`.
+     *
+     * With "all files access" this is `Documents/AAPS` as plain files, the same folder AIMI uses.
+     * It does not depend on the folder picker, and the Android document provider is not asked, so it
+     * also works on phones where the picker cannot show internal storage. Without that permission
+     * the folder chosen by the user is used, as before.
+     */
+    private fun baseDir(): DocumentFile? {
+        if (usesFixedFolder()) {
+            copyChosenFolderOnce()
+            documentsPath.mkdirs()
+            return DocumentFile.fromFile(documentsPath)
+        }
+        val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
+        return DocumentFile.fromTreeUri(context, prefUri.toUri())
+    }
+
     /**
      * Finds the sub folder, or creates it when it is really missing.
-     * `findFile` asks the provider for this one name. Creating only after that check keeps the
-     * provider from making "extra (1)", "extra (2)" ... on every call.
+     * A folder that Android renamed on creation ("extra (1)") means the provider did not show us the
+     * existing one. It is deleted again and null is returned, so no copies pile up.
      */
-    private fun DocumentFile.subDirectory(name: String): DocumentFile? =
-        findFile(name)?.takeIf { it.isDirectory } ?: createDirectory(name)
-
-    override fun ensurePreferenceDirExists(): DocumentFile? {
-        val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
-        val uri = Uri.parse(prefUri)
-        val baseDir = DocumentFile.fromTreeUri(context, uri)
-        return baseDir?.subDirectory(preferencesPath)
+    private fun DocumentFile.subDirectory(name: String): DocumentFile? {
+        findFile(name)?.takeIf { it.isDirectory }?.let { return it }
+        val created = createDirectory(name) ?: return null
+        if (created.name == name) return created
+        created.delete()
+        return null
     }
 
-    override fun ensureExportDirExists(): DocumentFile? {
-        val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
-        val uri = prefUri.toUri()
-        val baseDir = DocumentFile.fromTreeUri(context, uri)
-        return baseDir?.subDirectory(exportsPath)
+    /** `Documents/AAPS` is the folder to read, so the previously chosen folder is copied into it once. */
+    @Synchronized
+    private fun copyChosenFolderOnce() {
+        if (chosenFolderCopied) return
+        val marker = File(documentsPath, COPIED_MARKER)
+        if (marker.exists()) {
+            chosenFolderCopied = true
+            return
+        }
+        val old = chosenFolderAsFile() ?: return // nothing chosen yet: look again next time
+        runCatching {
+            documentsPath.mkdirs()
+            if (old.canonicalFile != documentsPath.canonicalFile && old.isDirectory) {
+                listOf(preferencesPath, exportsPath, tempPath, extraPath).forEach { name ->
+                    val from = File(old, name)
+                    if (from.isDirectory) from.copyRecursively(File(documentsPath, name), overwrite = false) { _, _ -> OnErrorAction.SKIP }
+                }
+            }
+            marker.writeText("copied from ${old.path}")
+        } // a failed copy is tried again at the next start, because the marker is not written then
+        chosenFolderCopied = true
     }
 
-    override fun ensureTempDirExists(): DocumentFile? {
-        val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
-        val uri = prefUri.toUri()
-        val baseDir = DocumentFile.fromTreeUri(context, uri)
-        return baseDir?.subDirectory(tempPath)
+    /** The chosen folder as a plain path. Only internal storage can be turned into one. */
+    private fun chosenFolderAsFile(): File? {
+        val uriString = preferences().getIfExists(StringKey.AapsDirectoryUri)
+        if (uriString.isNullOrEmpty()) return null
+        val documentId = runCatching { DocumentsContract.getTreeDocumentId(uriString.toUri()) }.getOrNull() ?: return null
+        if (!documentId.startsWith("primary:")) return null
+        return File(Environment.getExternalStorageDirectory(), documentId.removePrefix("primary:"))
     }
 
-    override fun ensureExtraDirExists(): DocumentFile? {
-        val prefUri = preferences().getIfExists(StringKey.AapsDirectoryUri) ?: return null
-        val uri = prefUri.toUri()
-        val baseDir = DocumentFile.fromTreeUri(context, uri)
-        return baseDir?.subDirectory(extraPath)
-    }
+    override fun ensurePreferenceDirExists(): DocumentFile? = baseDir()?.subDirectory(preferencesPath)
+
+    override fun ensureExportDirExists(): DocumentFile? = baseDir()?.subDirectory(exportsPath)
+
+    override fun ensureTempDirExists(): DocumentFile? = baseDir()?.subDirectory(tempPath)
+
+    override fun ensureExtraDirExists(): DocumentFile? = baseDir()?.subDirectory(extraPath)
 
     /**
      * Looks for `Documents/AAPS/extra/<name>` as a plain file.
-     * Needs "all files access". Some devices have no folder picker for internal storage, so the
-     * chosen folder cannot be set there. Returns null when this way is not available.
+     * Returns null when this is not possible (no "all files access"). The caller then asks the
+     * chosen folder instead.
      */
     override fun extraFileExists(name: String): Boolean? {
-        if (!Environment.isExternalStorageManager()) return null
+        if (!usesFixedFolder()) return null
+        copyChosenFolderOnce()
         return runCatching { File(File(documentsPath, extraPath), name).isFile }.getOrNull()
     }
 
@@ -288,6 +330,7 @@ class FileListProviderImpl(
     }
 
     override fun isDirectoryAccessGranted(): Boolean {
+        if (usesFixedFolder()) return true
         val uriString = preferences().getIfExists(StringKey.AapsDirectoryUri)
         if (uriString.isNullOrEmpty()) return false
         val uri = uriString.toUri()
@@ -297,6 +340,7 @@ class FileListProviderImpl(
     }
 
     override fun directoryPath(): String? {
+        if (usesFixedFolder()) return "Documents/AAPS"
         val uriString = preferences().getIfExists(StringKey.AapsDirectoryUri)
         if (uriString.isNullOrEmpty()) return null
         val uri = uriString.toUri()

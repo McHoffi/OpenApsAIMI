@@ -127,7 +127,7 @@ class Libre3AvailabilityProvider @Inject constructor(
      * failure path ends in an unavailable state.
      */
     private fun compute(uri: String?): Libre3Availability {
-        if (uri.isNullOrEmpty()) return Libre3Availability.AapsFolderUnavailable
+        if (uri.isNullOrEmpty() && !fileListProvider().usesFixedFolder()) return Libre3Availability.AapsFolderUnavailable
         return try {
             if (!fileListProvider().isDirectoryAccessGranted()) return Libre3Availability.FolderPermissionMissing
             // Resolving `extra` also creates it when it is missing, which is the project's normal

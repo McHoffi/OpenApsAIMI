@@ -106,7 +106,7 @@ class ConfigImpl(
         option in externalOptionsOverride.enabled() ||
             enabledOptionsCache.getOrPut(option) {
                 // The plain file is checked first. On some devices the folder picker cannot choose internal storage.
-                fileListProvider().extraFileExists(option.filename) == true ||
-                    fileListProvider().ensureExtraDirExists()?.findFile(option.filename) != null
+                fileListProvider().extraFileExists(option.filename)
+                    ?: (fileListProvider().ensureExtraDirExists()?.findFile(option.filename) != null)
             }
 }

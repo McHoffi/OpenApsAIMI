@@ -78,4 +78,5 @@
     <string name="remove_label">Entfernen</string>
     <string name="overview_edit_quickwizard_button_text">Schaltflächen-Text:</string>
     <string name="select_arrow">Auswahlpfeil</string>
+    <string name="maintenance_directory_fixed">AAPS nutzt den Ordner Documents/AAPS, weil es Zugriff auf alle Dateien hat. Dieser Ordner kann hier nicht geändert werden.</string>
 </resources>

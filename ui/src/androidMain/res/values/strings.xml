@@ -414,5 +414,5 @@
 
     <!-- GLASS fixed navigation -->
     <string name="dashboard_glass_nav_profiles">Profiles</string>
-
+    <string name="maintenance_directory_fixed">AAPS uses the folder Documents/AAPS because it has access to all files. This folder cannot be changed here.</string>
 </resources>

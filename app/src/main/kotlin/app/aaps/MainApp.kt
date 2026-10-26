@@ -480,13 +480,13 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
                 validityCheck = { preferences.get(StringKey.ProtectionMasterPassword) == "" }
             )
         // AAPS directory not selected
-        if (preferences.getIfExists(StringKey.AapsDirectoryUri).isNullOrEmpty())
+        if (preferences.getIfExists(StringKey.AapsDirectoryUri).isNullOrEmpty() && !fileListProvider.usesFixedFolder())
             notificationManager.post(
                 id = NotificationId.AAPS_DIR_NOT_SELECTED,
                 TextRef.AndroidRes(app.aaps.core.ui.R.string.aaps_directory_not_selected),
                 level = NotificationLevel.LOW,
                 actions = listOf(NotificationAction(TextRef.AndroidRes(R.string.select)) {}),
-                validityCheck = { preferences.getIfExists(StringKey.AapsDirectoryUri).isNullOrEmpty() }
+                validityCheck = { preferences.getIfExists(StringKey.AapsDirectoryUri).isNullOrEmpty() && !fileListProvider.usesFixedFolder() }
             )
         // AAPS directory selected, but the permission behind it is gone.
         //

@@ -737,10 +737,14 @@ class ComposeMainActivity : MetroAppCompatActivity() {
                     onOpenBatteryHelp = if (mainViewModel.showBatteryHelp) ({ mainViewModel.openBatteryHelp() }) else null,
                     onMaintenanceSheetDismiss = { mainViewModel.setShowMaintenanceSheet(false) },
                     onDirectoryClick = {
-                        try {
-                            accessTree?.launch(null)
-                        } catch (_: Exception) {
-                            maintenanceViewModel.emitError("Unable to launch activity. This is an Android issue")
+                        if (prefFileList.usesFixedFolder()) {
+                            maintenanceViewModel.emitError(getString(app.aaps.ui.R.string.maintenance_directory_fixed))
+                        } else {
+                            try {
+                                accessTree?.launch(null)
+                            } catch (_: Exception) {
+                                maintenanceViewModel.emitError("Unable to launch activity. This is an Android issue")
+                            }
                         }
                     },
                     onLaunchBrowser = { url ->

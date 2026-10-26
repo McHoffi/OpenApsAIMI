@@ -25,11 +25,11 @@ class ConfigImplOptionsTest {
     }
 
     @Test
-    fun `option is off when no way finds the file`() {
+    fun `plain file check is final when it says no`() {
         whenever(fileListProvider.extraFileExists("engineering_mode")).thenReturn(false)
-        whenever(fileListProvider.ensureExtraDirExists()).thenReturn(null)
 
         assertThat(sut().isEnabled(ExternalOptions.ENGINEERING_MODE)).isFalse()
+        verify(fileListProvider, never()).ensureExtraDirExists()
     }
 
     @Test

@@ -131,7 +131,7 @@ class DexcomOnePlusAvailabilityProvider @Inject constructor(
      * confirmed — every failure path falls through to an unavailable state.
      */
     private fun compute(uri: String?): DexcomOnePlusAvailability {
-        if (uri.isNullOrEmpty()) return DexcomOnePlusAvailability.AapsFolderUnavailable
+        if (uri.isNullOrEmpty() && !fileListProvider().usesFixedFolder()) return DexcomOnePlusAvailability.AapsFolderUnavailable
         return try {
             if (!fileListProvider().isDirectoryAccessGranted()) return DexcomOnePlusAvailability.FolderPermissionMissing
             // Resolving `extra` also creates it when missing — the project's standard behaviour for
