@@ -101,6 +101,20 @@ Use this file for every merge from `dev` and every release candidate.
       `btConnectsLock.withLock { btConnects.subList(0, seenBtConnects).clear() }`, which throws away
       a BT connect that arrives during a run - `AutomationRuntimeProcessingTest` caught it).
 
+- [ ] **Translations: never take `--theirs` for a `values-xx/strings.xml` file.** The fork has its own
+      German texts (AIMI, AutoISF, settings, pumps) that upstream does not have, and taking upstream's file
+      deletes them without any error. Resolve by key: keep upstream's text, and keep the fork's keys that
+      upstream does not have. Count the strings of each translation file before and after the merge:
+      ```bash
+      for f in $(git diff --name-only premerge-dev-<date> HEAD -- '*values-*/strings.xml'); do
+        echo "$(git show premerge-dev-<date>:$f | grep -c '<string ') -> $(grep -c '<string ' $f) $f"
+      done
+      ```
+      A big drop (more than a few strings) is a lost translation, not a clean-up. Check German (`de-rDE`)
+      and English; other languages are not kept up to date by the fork. Hit in the 2026-10-26 merge:
+      `core/ui` German went from 812 to 427 strings and nobody saw it until the settings screens showed
+      English. See `docs/MERGE_DEV_2026-10-26.md`.
+
 Notes:
 - No opportunistic refactor during merge conflict resolution.
 - Keep method signatures and contracts unchanged unless explicitly required.
