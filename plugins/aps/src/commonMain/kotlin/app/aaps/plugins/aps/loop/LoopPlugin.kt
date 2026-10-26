@@ -18,6 +18,7 @@ import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.aps.Loop.LastRun
 import app.aaps.core.interfaces.concurrent.AapsLock
 import app.aaps.core.interfaces.concurrent.withLock
+import app.aaps.core.interfaces.aps.SmbIntervalGate
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
@@ -47,6 +48,7 @@ import app.aaps.core.interfaces.pump.PumpStatusProvider
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.pump.VirtualPump
 import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.core.interfaces.queue.SmbPause
 import app.aaps.core.interfaces.receivers.ReceiverStatusStore
 import app.aaps.core.interfaces.resources.TextResolver
 import app.aaps.core.interfaces.resources.formatTemplate
@@ -140,6 +142,8 @@ class LoopPlugin(
     private val pumpStatusProvider: PumpStatusProvider,
     private val ch: ConcentrationHelper,
     private val runningModeReconciler: RunningModeReconciler,
+    private val smbPause: SmbPause,
+
     @ApplicationScope private val appScope: CoroutineScope
 ) : PluginBase(
     PluginDescription()
@@ -847,12 +851,6 @@ class LoopPlugin(
             resultAfterConstraints.smbConstraint = ConstraintObject(resultAfterConstraints.smb, aapsLogger)
             resultAfterConstraints.smb = constraintChecker.applyBolusConstraints(resultAfterConstraints.smbConstraint!!).value()
 
-            // safety check for multiple SMBs
-            val lastBolusTime = persistenceLayer.getNewestBolus()?.timestamp ?: 0L
-            if (lastBolusTime != 0L && lastBolusTime + T.mins(preferences.get(IntKey.ApsMaxSmbFrequency).toLong()).msecs() > dateUtil.now()) {
-                aapsLogger.debug(LTag.APS, "SMB requested but still in ${preferences.get(IntKey.ApsMaxSmbFrequency)} min interval")
-                resultAfterConstraints.smb = 0.0
-            }
             prevCarbsreq = lastRun?.constraintsProcessed?.carbsReq ?: prevCarbsreq
             if (lastRun == null) lastRun = LastRun()
             lastRun?.let { lastRun ->
@@ -1202,13 +1200,16 @@ class LoopPlugin(
         }
     }
 
-    private suspend fun applySMBRequest(request: APSResult): PumpEnactResult {
+    // Internal for the tests of its checks, without driving a whole loop run to the SMB branch.
+    internal suspend fun applySMBRequest(request: APSResult): PumpEnactResult {
         val pump = activePlugin.activePump
+        // Safety check for multiple SMBs, independent of the APS. It runs after the temp basal, so it also
+        // sees a bolus the pump driver wrote while the temp basal was being set.
         val lastBolusTime = persistenceLayer.getNewestBolus()?.timestamp ?: 0L
         val now = dateUtil.now()
         val smbIntervalMin = preferences.get(IntKey.ApsMaxSmbFrequency)
         val lastBolusAgeSec = if (lastBolusTime > 0L) ((now - lastBolusTime).coerceAtLeast(0L) / 1000.0) else Double.NaN
-        if (lastBolusTime != 0L && lastBolusTime + T.mins(smbIntervalMin.toLong()).msecs() > now) {
+        if (SmbIntervalGate.tooSoon(lastBolusTime, smbIntervalMin, now)) {
             aapsLogger.debug(
                 LTag.APS,
                 formatTemplate(
@@ -1233,22 +1234,27 @@ class LoopPlugin(
             aapsLogger.debug(LTag.APS, "applySMBRequest: " + rh.gs(InterfacesStrings.pumpsuspended))
             return pumpEnactResultProvider().comment(InterfacesStrings.pumpsuspended).enacted(false).success(false)
         }
+        // The user is confirming a bolus that was calculated without this SMB. Checked here, before the user entry
+        // below, so the log does not show an SMB that was never given. The queue checks again.
+        if (smbPause.isActive()) {
+            aapsLogger.debug(LTag.APS, "applySMBRequest: no SMB while a bolus is waiting for confirmation")
+            return pumpEnactResultProvider().comment(CoreUiStrings.smb_paused_for_bolus).enacted(false).success(false)
+        }
         aapsLogger.debug(
             LTag.APS,
             formatTemplate(
-                "applySMBRequest: requested=%.2fU deliverAt=%s lastBolusAge=%.0fs pumpStep=%.3fU",
+                "applySMBRequest: requested=%.2fU deliverAt=%s lastBolusAge=%.0fs",
                 listOf(
                     request.smb,
                     request.deliverAt?.let { dateUtil.dateAndTimeAndSecondsString(it) } ?: "n/a",
-                    lastBolusAgeSec,
-                    pump.pumpDescription.bolusStep
+                    lastBolusAgeSec
                 )
             )
         )
 
         // deliver SMB
         val detailedBolusInfo = DetailedBolusInfo()
-        detailedBolusInfo.lastKnownBolusTime = persistenceLayer.getNewestBolus()?.timestamp ?: 0L
+        detailedBolusInfo.lastKnownBolusTime = lastBolusTime
         detailedBolusInfo.eventType = TE.Type.CORRECTION_BOLUS
         detailedBolusInfo.insulin = request.smb
         detailedBolusInfo.bolusType = BS.Type.SMB

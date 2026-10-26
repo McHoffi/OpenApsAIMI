@@ -394,6 +394,7 @@ diaconn_g8_logtubechange|DiaconnBooleanKey|true
 diagonn_g8_address|DiaconnStringNonKey|true
 dura_ISF_weight|DoubleKey|true
 dynisf_adjust_sensitivity|BooleanKey|true
+eat_reminder|StringNonKey|false
 eatingsoon_target|UnitDoubleKey|true
 email_for_crash_report|StringKey|true
 enableBoostPercentScale|BooleanKey|true

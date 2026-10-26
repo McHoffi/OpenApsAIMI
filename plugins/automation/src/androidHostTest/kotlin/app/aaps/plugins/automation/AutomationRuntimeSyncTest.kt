@@ -1,6 +1,5 @@
 package app.aaps.plugins.automation
 
-import app.aaps.core.interfaces.alerts.ReminderScheduler
 import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.location.LocationServiceController
@@ -70,7 +69,6 @@ class AutomationRuntimeSyncTest : TestBaseWithProfile() {
     @Mock lateinit var constraintChecker: ConstraintsChecker
     @Mock lateinit var loop: Loop
     @Mock lateinit var locationServiceController: LocationServiceController
-    @Mock lateinit var reminderScheduler: ReminderScheduler
     @Mock lateinit var receiverStatusStore: ReceiverStatusStore
     @Mock lateinit var uel: UserEntryLogger
     @Mock lateinit var sceneApi: SceneAutomationApi
@@ -103,7 +101,7 @@ class AutomationRuntimeSyncTest : TestBaseWithProfile() {
 
     private fun newRuntime(factory: AutomationEventFactory = eventFactory) = AutomationRuntime(
         mock<LocationPermissions>(), factory, aapsLogger, text, preferences, loop, rxBus, constraintChecker,
-        config, locationServiceController, dateUtil, activePlugin, reminderScheduler, actionFactory, triggerFactory, triggerDeps, receiverStatusStore,
+        config, locationServiceController, dateUtil, activePlugin, actionFactory, triggerFactory, triggerDeps, receiverStatusStore,
         uel, profileRepository, sceneApi, mock()
     )
 

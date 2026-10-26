@@ -27,6 +27,7 @@ import app.aaps.core.interfaces.aps.MealHypothesisCoreState
 import app.aaps.core.interfaces.overview.graph.SeriesType
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.ChartStyle
+import app.aaps.core.data.ui.MarkerTier
 import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
 import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
@@ -99,14 +100,13 @@ fun timestampToX(timestamp: Long, minTimestamp: Long): Double =
  */
 @Composable
 fun rememberTimeFormatter(minTimestamp: Long): CartesianValueFormatter {
-    return remember(minTimestamp) {
+    val timeZone = TimeZone.currentSystemDefault()
+    return remember(minTimestamp, timeZone) {
         CartesianValueFormatter { _, value, _ ->
             val timestamp = minTimestamp + (value * 60000).toLong()
             // Always 24 hour, as SimpleDateFormat("HH") was: on an axis a bare 12 hour label would
             // not say which half of the day it belongs to.
-            Instant.fromEpochMilliseconds(timestamp)
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .hour.toString().padStart(2, '0')
+            graphTimeLabel(timestamp, timeZone)
         }
     }
 }
@@ -122,9 +122,10 @@ fun rememberTimeFormatter(minTimestamp: Long): CartesianValueFormatter {
 @OptIn(ExperimentalTime::class)
 @Composable
 fun rememberBottomAxisItemPlacer(minTimestamp: Long): HorizontalAxis.ItemPlacer {
-    return remember(minTimestamp) {
+    val timeZone = TimeZone.currentSystemDefault()
+    return remember(minTimestamp, timeZone) {
         val instant = Instant.fromEpochMilliseconds(minTimestamp)
-        val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+        val localDateTime = instant.toLocalDateTime(timeZone)
         val minutesIntoHour = localDateTime.minute
         val offsetToNextHour = if (minutesIntoHour == 0) 0 else 60 - minutesIntoHour
 
@@ -1615,6 +1616,26 @@ fun niceScale(min: Double, max: Double, maxTickCount: Int = 5): NiceScale {
     val range = niceNum(safeMax - min, round = false)
     val step = niceNum(range / (maxTickCount - 1), round = true)
     return NiceScale(floor(min / step) * step, ceil(safeMax / step) * step, step)
+}
+
+/**
+ * How far above the real data a predicted curve may pull the top of the BG axis, in mg/dl.
+ * Converted to the user's units where it is used.
+ */
+const val PREDICTION_AXIS_HEADROOM_MGDL = 54.0
+
+/**
+ * The value the top of the BG axis is fitted to. A real value ([realMax]: readings, calibrations,
+ * BG checks) widens the axis freely, and so does [highMark]. A predicted value ([predictionMax])
+ * counts only up to [headroom] above the higher of those two: a COB curve that runs off towards
+ * 20 mmol/L used to pull the axis up to 20 and press the real readings together at the bottom of
+ * the graph. Above the cap the curve is clipped at the top edge, which still shows that it is
+ * heading there. Downwards there is no cap, a predicted low must stay in view.
+ */
+fun bgAxisTop(realMax: Double?, predictionMax: Double?, highMark: Double, headroom: Double): Double {
+    val realTop = maxOf(realMax ?: highMark, highMark)
+    val predictionTop = predictionMax?.coerceAtMost(realTop + headroom) ?: realTop
+    return maxOf(realTop, predictionTop)
 }
 
 /** Rounds [value] up to the nearest nice number (1/2/5/10 x 10^n). Used for a lone axis bound. */

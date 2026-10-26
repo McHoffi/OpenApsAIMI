@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
  * @property glucoseRingStep3 Color for the third band of the glucose hero ring
  * @property glucoseRingStep4 Color for the fourth (high) band of the glucose hero ring
  * @property glucoseRingSurface Faint fill drawn behind the glucose hero ring's centre text
+ * @property graphGrid Color for the grid lines on the overview graphs, translucent so a band drawn under them shows through
  */
 data class GeneralColors(
     val activeInsulinText: Color,
@@ -88,6 +89,7 @@ data class GeneralColors(
     val aCobPrediction: Color,
     val uamPrediction: Color,
     val ztPrediction: Color,
+    val graphGrid: Color,
     // Loop mode colors
     val loopClosed: Color,
     val loopOpened: Color,
@@ -159,6 +161,7 @@ val LightGeneralColors = GeneralColors(
     aCobPrediction = Color(0x80FB8C00),      // lighter orange for absorbed COB (50% alpha)
     uamPrediction = Color(0xFFC9BD60),       // yellow-ish for UAM predictions (matches uamColor attr)
     ztPrediction = Color(0xFF00D2D2),        // cyan for zero-temp predictions (matches ztColor attr)
+    graphGrid = Color(0x80CAC4D0),           // Material outlineVariant at 50%
     // Loop mode colors
     loopClosed = Color(0xFF00C03E),          // green for closed loop
     loopOpened = Color(0xFF4983D7),          // blue for open loop
@@ -224,6 +227,7 @@ val DarkGeneralColors = GeneralColors(
     aCobPrediction = Color(0x80FFB74D),      // lighter orange for absorbed COB (50% alpha, dark mode)
     uamPrediction = Color(0xFFE6D39A),       // lighter yellow for UAM predictions (dark mode)
     ztPrediction = Color(0xFF4DD4D4),        // lighter cyan for zero-temp predictions (dark mode)
+    graphGrid = Color(0x40938F99),           // Material outline at 25%: outlineVariant at 50% was barely visible on the dark surface
     // Loop mode colors (same in both modes)
     loopClosed = Color(0xFF00C03E),          // green for closed loop
     loopOpened = Color(0xFF4983D7),          // blue for open loop

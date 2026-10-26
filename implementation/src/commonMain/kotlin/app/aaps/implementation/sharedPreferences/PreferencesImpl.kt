@@ -3,6 +3,7 @@ package app.aaps.implementation.sharedPreferences
 import app.aaps.core.data.model.devAssert
 import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.concurrent.AapsLock
+import app.aaps.core.interfaces.concurrent.withLock
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -86,12 +87,11 @@ class PreferencesImpl(
     // a list would mean a linear scan per key against well over a thousand of them. LinkedHashSet
     // keeps insertion order, so everything that iterates this still sees the same sequence.
     //
-    // Readers must never iterate a set that a writer can touch. registerPreferences runs when a
-    // plugin is constructed, which can be any thread, while the running-config publisher reads this
-    // list on Dispatchers.IO - that race threw ConcurrentModificationException. So a writer builds a
-    // new set and publishes it (copy on write), and a reader always iterates one that nothing can
-    // change. Writes happen once per plugin at start and reads happen on every publish, so paying the
-    // copy on the write and nothing on the read is the right way round.
+    // Copy on write. A plugin registers its keys when it is created, which can be late and on any
+    // thread, while other threads read this set - the Nightscout sync publisher reads the sync keys
+    // on a background thread. Adding to a LinkedHashSet while another thread walks it throws
+    // ConcurrentModificationException (seen in getSyncKeys on 4.0.0-rc1). So a registration builds
+    // a new set and swaps it in, and a reader always walks one complete set without a lock.
     @Volatile
     private var prefsList: Set<NonPreferenceKey> =
         (BooleanComposedKey.entries +
@@ -111,13 +111,8 @@ class PreferencesImpl(
             ProfileComposedBooleanKey.entries +
             ProfileIntKey.entries).toCollection(LinkedHashSet())
 
-    /**
-     * Guards the read-modify-write in [registerPreferences].
-     *
-     * A lock of its own, never [prefsList]: a second thread would lock the object that has just been
-     * replaced, which is the case [AapsLock] warns about.
-     */
-    private val prefsWriteLock = AapsLock()
+    /** Only so that two registrations at the same time cannot lose each other's keys. Readers do not take it. */
+    private val prefsListLock = AapsLock()
 
     // Emits a key on every LOCAL write to a Bidirectional-synced preference (not on putRemote), so
     // the client→master sync publisher can push local edits. Buffered + DROP_OLDEST so a pref write
@@ -467,11 +462,8 @@ class PreferencesImpl(
     }
 
     override fun registerPreferences(keys: List<NonPreferenceKey>) {
-        // Read-modify-write: without the lock, two plugins registering at the same time would each
-        // copy the same old set and one of the two key sets would be lost.
-        prefsWriteLock.withLock {
-            prefsList = LinkedHashSet(prefsList).apply { addAll(keys) }
-        }
+        // Set + Iterable gives a new LinkedHashSet, in the same order as before.
+        prefsListLock.withLock { prefsList = prefsList + keys }
     }
 
     override fun allMatchingStrings(key: ComposedKey): List<String> =
