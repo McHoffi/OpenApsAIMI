@@ -734,7 +734,6 @@ open class OpenAPSBoostV5Plugin @Inject constructor(
     override fun getIc(profile: Profile): Double? = openAPSBoostEngine().getIc(profile)
     override fun getIc(timestamp: Long, profile: Profile): Double? = openAPSBoostEngine().getIc(timestamp, profile)
     override fun getIsfMgdl(profile: Profile, caller: String): Double? = openAPSBoostEngine().getIsfMgdl(profile, caller)
-    override fun getAverageIsfMgdl(timestamp: Long, caller: String): Double? = openAPSBoostEngine().getAverageIsfMgdl(timestamp, caller)
     override fun getSensitivityOverviewString(): String? = openAPSBoostEngine().getSensitivityOverviewString()
 
     // ── Delegated to the engine ─────────────────────────────────────────────────────────────

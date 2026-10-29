@@ -426,7 +426,6 @@ open class OpenAPSBoostPlugin @Inject constructor(
         return null
     }
 
-    override fun getAverageIsfMgdl(timestamp: Long, caller: String): Double? = null
 
     override fun getSensitivityOverviewString(): String? = null
 

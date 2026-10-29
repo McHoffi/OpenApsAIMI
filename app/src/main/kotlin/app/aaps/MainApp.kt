@@ -1,6 +1,7 @@
 package app.aaps
 
 import android.app.Application
+import android.app.LocaleManager
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.content.IntentFilter
@@ -16,6 +17,7 @@ import android.os.Environment
 import android.util.Log
 import app.aaps.plugins.aps.openAPSAIMI.StepService
 import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorageHelper
+import android.os.LocaleList
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import app.aaps.core.data.configuration.Constants
@@ -27,6 +29,7 @@ import app.aaps.core.data.time.T
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.configuration.ExternalOptions
+import app.aaps.core.interfaces.db.VacuumResult
 import app.aaps.core.interfaces.di.MetroMemberInjector
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.NotificationAction
@@ -41,7 +44,6 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.compose.MetroViewModelFactoryOwner
-import app.aaps.core.ui.locale.LocaleHelper
 import app.aaps.database.di.DatabaseConfig
 import app.aaps.di.ExternalOptionsOverride
 import app.aaps.di.GeneratedStringOwners
@@ -57,6 +59,9 @@ import app.aaps.implementation.receivers.ChargingStateReceiver
 import app.aaps.implementation.receivers.KeepAliveWorker
 import app.aaps.implementation.receivers.NetworkChangeReceiver
 import app.aaps.implementation.receivers.TimeDateOrTZChangeReceiver
+import app.aaps.settingsstore.AndroidStorage
+import app.aaps.settingsstore.IdleWorkerFactory
+import app.aaps.settingsstore.SettingsUnreadableNotification
 import app.aaps.utils.configureLeakCanary
 import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
@@ -70,6 +75,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -86,6 +95,7 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.full.declaredMemberProperties
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import android.content.res.Configuration as ResourcesConfiguration
 import app.aaps.core.interfaces.R as InterfacesR
 import app.aaps.core.ui.R as CoreUiR
 
@@ -101,7 +111,12 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         private val PLUGIN_START_WAIT = 30.seconds
     }
 
-    override fun injectMembers(target: Any): Boolean = metroGraphs.injectMembers(target)
+    // When the settings cannot be opened, ComposeMainActivity only hands over to SettingsUnreadableActivity and
+    // finishes. Filling its fields would build some 40 objects - plugins, the command queue - for nothing,
+    // and on settings that are not the user's.
+    override fun injectMembers(target: Any): Boolean =
+        if (AndroidStorage.failure != null && target is ComposeMainActivity) true
+        else metroGraphs.injectMembers(target)
 
     override val metroViewModelFactory: MetroViewModelFactory get() = metroGraphs.viewModelFactory
 
@@ -123,15 +138,19 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
     // it does not know returns null and falls back to WorkManager's default reflective factory, which
     // is what builds WorkManager's own internal workers. The default androidx.startup
     // WorkManagerInitializer is removed in AndroidManifest.xml so this config wins.
+    // While the settings cannot be opened, the app's jobs do nothing (see IdleWorkerFactory).
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setWorkerFactory(MetroWorkerFactory(metroGraphs))
+            .setWorkerFactory(
+                if (AndroidStorage.failure == null) MetroWorkerFactory(metroGraphs)
+                else IdleWorkerFactory { metroGraphs.workerCreators().keys }
+            )
             .build()
 
     private val pluginStore get() = metroGraphs.pluginStore
     private val aapsLogger get() = metroGraphs.aapsLogger
     private val versionCheckersUtils get() = metroGraphs.versionCheckerUtils
-    private val sp get() = metroGraphs.sp
+    private val sp get() = metroGraphs.keyValueStore
     private val preferences get() = metroGraphs.preferences
     private val config get() = metroGraphs.config
     private val configBuilder get() = metroGraphs.configBuilder
@@ -172,6 +191,7 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
     private val snackbarNotificationFallback get() = metroGraphs.snackbarNotificationFallback
     private val eatReminder get() = metroGraphs.eatReminder
     private val appScope get() = metroGraphs.applicationScope
+    private val uiRestart get() = metroGraphs.uiRestart
 
     /** The rules; the two fields below are what this app's start-up sequence carries between its steps. */
     private val insulinMigration get() = InsulinMigration(aapsLogger, hardLimits, rh)
@@ -203,8 +223,18 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         super.onCreate()
         copyModelToInternalStorage(this)
 
+        // The settings first: everything below reads them. Opened here on purpose, not on first use, so a
+        // store that cannot be read is found at once and handled in one place.
+        val storage = AndroidStorage.open(this)
+        storage.failure?.let { failure ->
+            startWithoutSettings(failure, storage.notes)
+            return
+        }
         GeneratedStringOwners.registerAll()
         resourceHelperImpl.start()
+        // As early as possible, so the first screen is already in it
+        applyAppLanguage()
+        appLocales = resources.configuration.locales
         // Applies the analytics opt-out. Must come before configureLeakCanary below, which reports
         // through fabricPrivacy.
         fabricPrivacyImpl.start()
@@ -217,6 +247,10 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
 
         // Here should be everything injected
         aapsLogger.debug("onCreate")
+        storage.notes.forEach { aapsLogger.info(LTag.CORE, it) }
+        AndroidStorage.onSaveFailure = { aapsLogger.error(LTag.CORE, "Settings could not be saved, the next change tries again: ${it.message}") }
+        // Left by an earlier start whose settings could not be opened.
+        SettingsUnreadableNotification.cancel(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(processLifecycleListener)
 
         // Background fallback for EventShowSnackbar: when no GlobalSnackbarHost is collecting,
@@ -296,11 +330,157 @@ class MainApp : Application(), MetroMemberInjector, MetroViewModelFactoryOwner, 
         }
     }
 
+    /**
+     * The settings could not be opened ([AndroidStorage] says why), so AAPS does not start: no plugins, so no
+     * loop, and nothing written to the database. The app runs on an empty store that lives in memory only,
+     * which keeps its parts from crashing without writing over the unreadable file. A notification that
+     * cannot be swiped away says so, and SettingsUnreadableActivity shows the way out.
+     */
+    private fun startWithoutSettings(failure: Exception, notes: List<String>) {
+        GeneratedStringOwners.registerAll()
+        // The user's answer about analytics and crash reports is in the settings that cannot be read, so it
+        // is "no" now - in memory only, like everything else.
+        sp.putBoolean(BooleanKey.MaintenanceEnableFabric.key, false)
+        fabricPrivacyImpl.start()
+        notes.forEach { aapsLogger.info(LTag.CORE, it) }
+        aapsLogger.error(LTag.CORE, "The settings cannot be opened, so AAPS does not start", failure)
+        SettingsUnreadableNotification.show(this, metroGraphs.iconsProvider.getNotificationIcon())
+    }
+
+    // Perform a full VACUUM at most once a month. VACUUM defragments the DB file and reclaims
+    // space, restoring query performance that degrades after long use. It is heavy and memory
+    // intensive, so it runs only here at startup while nothing else touches the DB (this avoids
+    // the SQLITE_NOMEM crash seen when VACUUM overlapped live DB activity).
+    private suspend fun vacuumDatabaseIfDue() {
+        val lastRun = preferences.get(LongNonKey.LastVacuumRun)
+        if (lastRun >= dateUtil.now() - T.days(30).msecs()) return
+
+        // Crash-loop guard. VACUUM can die below the JVM (native SQLite abort / OOM) in a way no
+        // try/catch can intercept — the process just vanishes, leaving no log. If that happened last
+        // time, the committed flag below is still set (the finally never ran). Detect it, skip
+        // VACUUM so the app can boot, and back off a month instead of re-crashing on every launch.
+        if (preferences.get(BooleanNonKey.VacuumInProgress)) {
+            aapsLogger.error(LTag.CORE, "Previous startup VACUUM did not finish (likely native crash) — skipping for 30 days")
+            // Report to Firebase so we get a fleet-wide count of users hit by a crashing startup VACUUM.
+            fabricPrivacy.logCustom("db_vacuum_crash_recovered")
+            preferences.put(BooleanNonKey.VacuumInProgress, false)
+            preferences.put(LongNonKey.LastVacuumRun, dateUtil.now())
+            return
+        }
+
+        config.updateInitProgress(getString(R.string.optimizing_database))
+        try {
+            // Log size + per-table counts (total / older-than-retention backlog / tracked changes)
+            // before VACUUM, so a crash report tells us whether the DB is the problem. 6*31 mirrors
+            // KeepAliveWorker.databaseCleanup's retention so "deletable" reflects the real backlog.
+            val info = persistenceLayer.databaseMaintenanceInfo(retentionDays = 6L * 31)
+            aapsLogger.info(LTag.CORE, "Startup DB maintenance, pre-VACUUM diagnostics:\n${info.report}")
+            // Crashlytics breadcrumb: attaches the diagnostics to any exception logged below.
+            fabricPrivacy.logMessage("Pre-VACUUM: ${info.report}")
+            val dbMb = info.dbSizeBytes / 1_048_576
+            // VACUUM rebuilds the whole DB into a temporary copy, so it needs roughly the DB size
+            // again in free space. Skip (and retry next launch) if there isn't enough, to avoid a
+            // SQLITE_FULL failure mid-rebuild.
+            if (info.availableBytes in 0 until info.dbSizeBytes * 2) {
+                val freeMb = info.availableBytes / 1_048_576
+                aapsLogger.warn(LTag.CORE, "Skipping startup VACUUM: free $freeMb MB < 2x DB $dbMb MB")
+                fabricPrivacy.logCustom("db_vacuum_skip_space", mapOf("db_mb" to dbMb, "free_mb" to freeMb))
+                return
+            }
+            // Commit the marker synchronously BEFORE running: a plain put() uses apply() and may not
+            // reach disk before an early native abort (e.g. during the wal_checkpoint VACUUM starts with).
+            sp.edit(commit = true) { putBoolean(BooleanNonKey.VacuumInProgress.key, true) }
+            val result = persistenceLayer.vacuumDatabase()
+            // Advance the timestamp on every result here, and only here: a thrown failure (e.g. DB busy
+            // because a persisted worker is running) is retried on a future launch instead of suppressed
+            // for a month. OUT_OF_MEMORY is not one of those: the next launch would fail the same way, so
+            // it waits a month too.
+            preferences.put(LongNonKey.LastVacuumRun, dateUtil.now())
+            when (result) {
+                VacuumResult.DONE, VacuumResult.DONE_AFTER_TRIM -> {
+                    aapsLogger.debug(LTag.CORE, "Startup VACUUM done: $result")
+                    // Fleet overview of DB size / cleanup backlog / change-row volume across users.
+                    fabricPrivacy.logCustom("db_vacuum_ok", mapOf("db_mb" to dbMb, "deletable" to info.deletableRows, "changes" to info.changeRows))
+                    // How many databases only fit after the old APS results and device statuses were deleted.
+                    if (result == VacuumResult.DONE_AFTER_TRIM) fabricPrivacy.logCustom("db_vacuum_trimmed", mapOf("db_mb" to dbMb))
+                }
+
+                VacuumResult.OUT_OF_MEMORY                      -> {
+                    aapsLogger.error(LTag.CORE, "Startup VACUUM ran out of memory, even after trimming. Next try in 30 days.")
+                    fabricPrivacy.logCustom("db_vacuum_out_of_memory", mapOf("db_mb" to dbMb))
+                }
+            }
+        } catch (e: Throwable) {
+            // Throwable, not just Exception: a JVM OutOfMemoryError here must not abort app init.
+            aapsLogger.error(LTag.CORE, "Startup VACUUM failed", e)
+            // Catchable failures (SQLiteException, OOM) → Crashlytics non-fatal for the overview.
+            fabricPrivacy.logException(e)
+        } finally {
+            preferences.put(BooleanNonKey.VacuumInProgress, false)
+        }
+    }
+
+    /**
+     * Gives Android the language picked in AAPS as this app's language (Android 13 and newer). Android then shows
+     * the whole app in it - every screen, the notifications, the widget - and keeps the default locale on it, so
+     * numbers and dates are formatted in it too.
+     *
+     * AAPS used to move the default locale itself. Android sets the default locale back from the app's resources
+     * on many configuration updates, often without calling [onConfigurationChanged], so a Czech AAPS on an English
+     * phone showed "4.5" instead of "4,5" after its alarm screen had been shown.
+     *
+     * Android 12 has no app languages: there AAPS follows the phone's language, and the setting is hidden. Simple
+     * mode follows the phone too. Nothing is sent when Android has this language already.
+     */
+    private fun applyAppLanguage() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val tag = appLanguageTag(preferences.get(StringKey.GeneralLanguage), preferences.get(BooleanKey.GeneralSimpleMode))
+        val wanted = tag?.let { LocaleList.forLanguageTags(it) } ?: LocaleList.getEmptyLocaleList()
+        val localeManager = getSystemService(LocaleManager::class.java)
+        if (localeManager.applicationLocales == wanted) return
+        aapsLogger.debug(LTag.CORE, "App language: ${tag ?: "the phone's"}")
+        localeManager.applicationLocales = wanted
+    }
+
+    /** A change of the AAPS language or of Simple mode goes to Android. What follows is in [onConfigurationChanged]. */
+    private fun followLanguage() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        appScope.launch {
+            merge(preferences.observe(StringKey.GeneralLanguage), preferences.observe(BooleanKey.GeneralSimpleMode))
+                .map { appLanguageTag(preferences.get(StringKey.GeneralLanguage), preferences.get(BooleanKey.GeneralSimpleMode)) }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { applyAppLanguage() }
+        }
+    }
+
+    /** The app's language as Android applies it, to notice a change. Null until the app has started. */
+    private var appLocales: LocaleList? = null
+
+    /**
+     * The app's language changed: the one picked in AAPS ([applyAppLanguage]), or the phone's while AAPS follows it.
+     * Android recreates the screens itself, but text built before - in the overview cache and in the view models -
+     * is in the old language. So the screens are rebuilt through `UiRestart`, as iOS and the desktop do, and the home
+     * screen widget draws again; it would otherwise wait up to a minute.
+     *
+     * Here and not where the language is picked: Android delivers the new language a moment later, and text read
+     * before that would still come out in the old one.
+     */
+    override fun onConfigurationChanged(newConfig: ResourcesConfiguration) {
+        super.onConfigurationChanged(newConfig)
+        val previous = appLocales ?: return
+        if (newConfig.locales == previous) return
+        appLocales = newConfig.locales
+        aapsLogger.debug(LTag.CORE, "App language changed to ${newConfig.locales.toLanguageTags()}")
+        uiRestart.request()
+        widgetUpdater.update("LanguageChanged")
+    }
+
     private suspend fun doInit() {
         aapsLogger.debug("doInit")
         RxDogTag.install()
         setRxErrorHandler()
-        LocaleHelper.update(this@MainApp)
+        followLanguage()
 
         var gitRemote: String? = config.REMOTE
         var commitHash: String? = BuildConfig.HEAD

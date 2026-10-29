@@ -93,6 +93,7 @@ import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntNonKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.objects.aps.IsfForCarbs
 import app.aaps.core.objects.extensions.apsAdjustedTargetMgdl
 import app.aaps.core.objects.extensions.directionToLegacyDrawable
 import app.aaps.core.objects.extensions.round
@@ -1578,7 +1579,7 @@ class OverviewFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             val profile = profileFunction.getProfile()
             val request = loop.lastRun?.request
             val isfMgdl = profile?.getProfileIsfMgdl()
-            val isfForCarbs = profile?.getIsfMgdlForCarbs(dateUtil.now(), "Overview", config, processedDeviceStatusData)
+            val isfForCarbs = profile?.let { IsfForCarbs.load(persistenceLayer, dateUtil.now(), dateUtil.now()).isfMgdl(it, dateUtil.now()) }
             val variableSens =
                 if (config.APS) request?.variableSens ?: 0.0
                 else if (config.AAPSCLIENT) processedDeviceStatusData.getAPSResult()?.variableSens ?: 0.0

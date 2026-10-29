@@ -55,7 +55,7 @@ import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.math.roundToInt
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import kotlinx.coroutines.runBlocking
 
 /** Support communication with Garmin devices.
@@ -75,7 +75,7 @@ class GarminPlugin(
     aapsLogger: AAPSLogger,
     rh: TextResolver,
     preferences: Preferences,
-    private val sp: SP,
+    private val sp: KeyValueStore,
     private val context: Context,
     private val loopHub: LoopHub,
     private val persistenceLayer: PersistenceLayer,

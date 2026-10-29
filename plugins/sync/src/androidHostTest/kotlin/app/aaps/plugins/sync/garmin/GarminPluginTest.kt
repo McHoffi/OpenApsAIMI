@@ -8,7 +8,6 @@ import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.sharedPreferences.SP
-import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.IntNonKey
 import app.aaps.core.keys.StringNonKey

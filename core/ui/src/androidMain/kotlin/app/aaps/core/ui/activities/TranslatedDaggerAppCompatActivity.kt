@@ -1,21 +1,15 @@
 package app.aaps.core.ui.activities
 
-import android.content.Context
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import androidx.core.view.MenuProvider
-import app.aaps.core.ui.locale.LocaleHelper
 import app.aaps.core.ui.compose.MetroAppCompatActivity
 
 open class TranslatedDaggerAppCompatActivity : MetroAppCompatActivity() {
 
     private var menuProvider: MenuProvider? = null
-
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(LocaleHelper.wrap(newBase))
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

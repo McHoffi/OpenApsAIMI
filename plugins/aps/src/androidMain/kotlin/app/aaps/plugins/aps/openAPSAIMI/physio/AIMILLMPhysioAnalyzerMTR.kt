@@ -2,7 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import app.aaps.core.keys.StringKey
 import app.aaps.plugins.aps.openAPSAIMI.llm.LlmHttpRetry
 import app.aaps.plugins.aps.openAPSAIMI.llm.LlmWorldConservativePreamble
@@ -47,7 +47,7 @@ import dev.zacsweers.metro.AppScope
  */
 @SingleIn(AppScope::class)
 class AIMILLMPhysioAnalyzerMTR @Inject constructor(
-    private val sp: SP,
+    private val sp: KeyValueStore,
     private val aapsLogger: AAPSLogger,
     private val context: android.content.Context
 ) {

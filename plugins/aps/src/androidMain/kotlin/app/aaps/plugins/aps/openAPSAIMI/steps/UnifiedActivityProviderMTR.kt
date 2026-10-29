@@ -7,7 +7,7 @@ import app.aaps.core.data.model.HR
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.AppScope
@@ -34,7 +34,7 @@ import kotlinx.coroutines.runBlocking
 @SingleIn(AppScope::class)
 class UnifiedActivityProviderMTR @Inject constructor(
     private val persistenceLayer: PersistenceLayer,
-    private val sp: SP,
+    private val sp: KeyValueStore,
     private val aapsLogger: AAPSLogger
 ) : ActivityVitalsProvider {
 

@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
 import app.aaps.core.ui.compose.formatMinutesAsDuration
@@ -48,7 +48,7 @@ import kotlin.time.Duration.Companion.minutes
 class ContextActivity : TranslatedDaggerAppCompatActivity() {
     
     @Inject lateinit var contextManager: ContextManager
-    @Inject lateinit var sp: SP
+    @Inject lateinit var sp: KeyValueStore
     @Inject lateinit var rh: ResourceHelper
     @Inject lateinit var aapsLogger: AAPSLogger
     @Inject lateinit var healthContextRepository: HealthContextRepository

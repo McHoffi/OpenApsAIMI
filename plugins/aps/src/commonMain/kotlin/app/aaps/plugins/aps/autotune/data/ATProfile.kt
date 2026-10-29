@@ -247,6 +247,12 @@ class ATProfile(
      * integer for a whole numbered value: a `1.0` is written `1.0`.
      */
 
+    /**
+     * The hourly basal as a profile schedule, rounded to 0.01 U/h. Autotune itself works with three
+     * decimals ([basal]), but no pump AAPS drives takes a finer basal step than 0.01, and the profile
+     * editor shows two decimals. With the third one kept, the editor stepped and summed digits the user
+     * could not see (#5401, #5402).
+     */
     private fun jsonArrayOf(values: DoubleArray): JsonArray =
         buildJsonArray {
             for (h in 0..23) {
@@ -254,7 +260,7 @@ class ATProfile(
                     buildJsonObject {
                         put("time", NumberFormat.INTEGER_2_DIGITS.format(h.toLong()) + ":00")
                         put("timeAsSeconds", h * 60 * 60)
-                        put("value", values[h])
+                        put("value", Round.roundTo(values[h], 0.01))
                     }
                 )
             }

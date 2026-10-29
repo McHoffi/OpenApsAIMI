@@ -1,6 +1,5 @@
 package app.aaps.plugins.configuration.activities
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,7 +9,6 @@ import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.ui.locale.LocaleHelper
 import app.aaps.core.ui.compose.MetroAppCompatActivity
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import dev.zacsweers.metro.HasMemberInjections
@@ -60,10 +58,6 @@ open class DaggerAppCompatActivityWithResult : MetroAppCompatActivity() {
         requestMultiplePermissions = null
         callForBatteryOptimization = null
         super.onDestroy()
-    }
-
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(LocaleHelper.wrap(newBase))
     }
 
     open fun updateButtons() {}

@@ -10,7 +10,6 @@ import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.plugin.EnforcedState
-import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
@@ -32,7 +31,6 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
     @Mock lateinit var glucoseStatusProvider: GlucoseStatusProvider
     @Mock lateinit var determineBasalSMB: DetermineBasalAutoISF
     @Mock lateinit var bgQualityCheck: BgQualityCheck
-    @Mock lateinit var profiler: Profiler
     // The fork's plugin carries the MTR providers and a Context on top of the upstream parameters.
     // None of the tests below reads them, so plain mocks are enough.
     @Mock lateinit var automationStateService: AutomationStateInterface
@@ -46,7 +44,7 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         openAPSAutoISFPlugin = OpenAPSAutoISFPlugin(
             aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin,
             iobCobCalculator, hardLimits, preferences, dateUtil, processedTbrEbData, persistenceLayer, glucoseStatusProvider,
-            bgQualityCheck, notificationManager, determineBasalSMB, profiler,
+            bgQualityCheck, notificationManager, determineBasalSMB,
             // The fork's calculator has no DecimalFormatter: the only line that used it is commented out.
             GlucoseStatusCalculatorAutoIsf(aapsLogger, iobCobCalculator, dateUtil, deltaCalculator), { apsResultProvider() }, ch,
             automationStateService, unifiedActivityProvider, physioAdapter, stepsManager, { loop }, context

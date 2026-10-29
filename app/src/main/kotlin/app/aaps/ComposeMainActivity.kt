@@ -3,7 +3,6 @@ package app.aaps
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -157,7 +156,6 @@ import app.aaps.plugins.aps.openAPSAIMI.advisor.meal.MealAdvisorActivity
 import app.aaps.plugins.aps.openAPSAIMI.context.ui.ContextActivity
 import app.aaps.core.ui.compose.pump.PumpActivityDialog
 import app.aaps.core.ui.compose.pump.PumpCommunicationStatus
-import app.aaps.core.ui.locale.LocaleHelper
 import app.aaps.core.ui.search.SearchableItem
 import app.aaps.core.utils.isRunningRealPumpTest
 import app.aaps.implementation.androidNotification.AlarmNotificationManager
@@ -177,6 +175,8 @@ import app.aaps.plugins.source.activities.RequestDexcomPermissionActivity
 import app.aaps.ui.compose.scenesSheet.ScenesViewModel
 import app.aaps.ui.compose.careDialog.CareportalEventType
 import app.aaps.ui.compose.clientcontrol.ClientControlPendingDialog
+import app.aaps.settingsstore.AndroidStorage
+import app.aaps.settingsstore.SettingsUnreadableActivity
 import app.aaps.ui.compose.configuration.ConfigurationViewModel
 import app.aaps.ui.compose.fillDialog.FillPreselect
 import app.aaps.ui.compose.insulinManagement.InsulinManagementViewModel
@@ -224,9 +224,13 @@ class ComposeMainActivity : MetroAppCompatActivity() {
 
     companion object {
         const val EXTRA_NAVIGATE_ROUTE = "extra_navigate_route"
+
+        /** The language this screen was shown in, to notice a recreate in another one (see onCreate). */
+        private const val STATE_LANGUAGE = "appLanguage"
     }
 
     @Inject lateinit var rxBus: RxBus
+    @Inject lateinit var uiRestart: UiRestart
     @Inject lateinit var snackbarHostPresence: SnackbarHostPresence
     @Inject lateinit var rh: ResourceHelper
     @Inject lateinit var aapsLogger: AAPSLogger
@@ -271,6 +275,9 @@ class ComposeMainActivity : MetroAppCompatActivity() {
     private var accessTree: ActivityResultLauncher<Uri?>? = null
     private var requestMultiplePermissions: ActivityResultLauncher<Array<String>>? = null
     private var onPermissionResultDenied: ((List<String>) -> Unit)? = null
+
+    /** Set when this activity is recreated because of a `UiRestart` request, so its view models go too. */
+    private var rebuildingForRestart = false
 
     /**
      * The factory `by viewModels()` uses.
@@ -334,11 +341,28 @@ class ComposeMainActivity : MetroAppCompatActivity() {
     private val disposable = CompositeDisposable()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (AndroidStorage.failure != null) {
+            // The settings cannot be opened, and AAPS is not started. This activity is not injected then (see
+            // MainApp.injectMembers): it only hands over. finish() here skips onStart and onResume.
+            super.onCreate(savedInstanceState)
+            startActivity(Intent(this, SettingsUnreadableActivity::class.java))
+            finish()
+            return
+        }
+        // Recreated in another language: the one picked in AAPS (Android 13 and newer), or the phone's while AAPS
+        // follows it. Android recreates this screen itself then, and keeps the view models, with the text they built in
+        // the old language. So they go. Before super.onCreate, so that none is made from the old store first.
+        if (savedInstanceState != null && savedInstanceState.getString(STATE_LANGUAGE) != resources.configuration.locales.toLanguageTags())
+            viewModelStore.clear()
         // Bar icon color is kept in sync with the AAPS-effective theme reactively
         // from inside AapsTheme via a SideEffect on WindowInsetsControllerCompat,
         // so a plain enableEdgeToEdge() here is enough.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Other apps may not draw over AAPS: an overlay could hide what a tap really does, for example on a bolus
+        // confirmation. It also covers the dialogs, because this window stays visible under them. System and
+        // accessibility overlays still show. Needs HIDE_OVERLAY_WINDOWS.
+        window.setHideOverlayWindows(true)
 
         // Activity result launchers (from base class)
         accessTree = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -985,11 +1009,17 @@ class ComposeMainActivity : MetroAppCompatActivity() {
         permissionsViewModel.refresh()
     }
 
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_LANGUAGE, resources.configuration.locales.toLanguageTags())
     }
 
     override fun onDestroy() {
+        // A recreate keeps the view models, so after a language change they still showed the texts
+        // they had built in the old language ("Buclă închisă" on a Czech screen), and after an import
+        // the values from before it. A restart rebuilds them too, as iOS and the desktop do. Cleared
+        // here, while Android hands this store to the next activity, so that one starts with none.
+        if (rebuildingForRestart) viewModelStore.clear()
         disposable.clear()
         accessTree = null
         requestMultiplePermissions = null
@@ -1004,9 +1034,14 @@ class ComposeMainActivity : MetroAppCompatActivity() {
         lifecycleScope.launch {
             preferences.observe(BooleanKey.OverviewKeepScreenOn).collect { setupWakeLock() }
         }
-        // Language change requires full restart to reload resources
+        // A rebuild asked for by code that cannot reach this activity: `MainApp` once Android has applied a
+        // new language, an import applying its settings. Android answers it by recreating; the view models
+        // go too, see onDestroy.
         lifecycleScope.launch {
-            preferences.observe(StringKey.GeneralLanguage).drop(1).collect { recreate() }
+            uiRestart.signal.drop(1).collect {
+                rebuildingForRestart = true
+                recreate()
+            }
         }
     }
 

@@ -3,7 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import app.aaps.plugins.aps.openAPSAIMI.steps.AIMIHealthConnectSyncServiceMTR
 import app.aaps.plugins.aps.openAPSAIMI.steps.UnifiedActivityProviderMTR
 import dev.zacsweers.metro.Inject
@@ -20,7 +20,7 @@ class AIMIPhysioPipelineWatchdogMTR @Inject constructor(
     private val permissionsHandler: AIMIHealthConnectPermissionsHandlerMTR,
     private val healthConnectSync: AIMIHealthConnectSyncServiceMTR,
     private val healthRepo: HealthContextRepository,
-    private val sp: SP,
+    private val sp: KeyValueStore,
     private val aapsLogger: AAPSLogger
 ) {
 

@@ -49,6 +49,7 @@ import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.objects.aps.IsfForCarbs
 import app.aaps.core.objects.extensions.convertedToAbsolute
 import app.aaps.core.ui.extensions.displayText
 import app.aaps.core.objects.extensions.round
@@ -484,7 +485,8 @@ class GraphViewModel(
             isfTo = decimalFormatter.to1Decimal(profileUtil.fromMgdlToUnits(variableSens, units))
             if (ratioUsed != 1.0 && ratioUsed != lastAutosensRatio)
                 dialogText.add(rh.gs(CoreUiStrings.algorithm_long, ratioUsed * 100))
-            val isfForCarbs = profile.getIsfMgdlForCarbs(dateUtil.now(), "Overview", config, processedDeviceStatusData)
+            val now = dateUtil.now()
+            val isfForCarbs = IsfForCarbs.load(persistenceLayer, now, now).isfMgdl(profile, now)
             dialogText.add(rh.gs(CoreUiStrings.isf_for_carbs, profileUtil.fromMgdlToUnits(isfForCarbs, units)))
             if (config.APS) {
                 activePlugin.activeAPS?.getSensitivityOverviewString()?.let { dialogText.add(it) }

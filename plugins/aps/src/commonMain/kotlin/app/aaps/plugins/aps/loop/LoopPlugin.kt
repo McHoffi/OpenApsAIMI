@@ -36,7 +36,6 @@ import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.notifications.AlarmSound
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationManager
-import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginDescription
@@ -68,6 +67,7 @@ import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.IntNonKey
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.objects.aps.IsfForCarbs
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.objects.extensions.asAnnouncement
 import app.aaps.core.objects.extensions.convertedToAbsolute
@@ -138,7 +138,6 @@ class LoopPlugin(
     notificationManager: NotificationManager,
     private val loopNotifier: LoopNotifier,
     private val pumpEnactResultProvider: () -> PumpEnactResult,
-    private val processedDeviceStatusData: ProcessedDeviceStatusData,
     private val pumpStatusProvider: PumpStatusProvider,
     private val ch: ConcentrationHelper,
     private val runningModeReconciler: RunningModeReconciler,
@@ -833,8 +832,7 @@ class LoopPlugin(
                 lastGlucoseWorkerLoopWallClock = dateUtil.now()
             }
 
-            // Store calculations to DB
-            persistenceLayer.insertOrUpdateApsResult(apsResult)
+            storeApsResult(apsResult)
 
             // Prepare for pumps using % basals
             if (pump.pumpDescription.tempBasalStyle == PumpDescription.PERCENT && allowPercentage()) {
@@ -1221,6 +1219,15 @@ class LoopPlugin(
         return true
     }
 
+    /**
+     * Stores what the algorithm calculated. A run that stopped early on bad CGM data calculated nothing and
+     * is not stored, see [APSResult.stoppedEarly]. Internal for its test, without driving a whole loop run.
+     */
+    internal suspend fun storeApsResult(apsResult: APSResult) {
+        if (apsResult.stoppedEarly) aapsLogger.debug(LTag.APS, "Stopped early, the result is not stored")
+        else persistenceLayer.insertOrUpdateApsResult(apsResult)
+    }
+
     // Internal for the tests of its checks, without driving a whole loop run to the SMB branch.
     internal suspend fun applySMBRequest(request: APSResult): PumpEnactResult {
         val pump = activePlugin.activePump
@@ -1421,9 +1428,13 @@ class LoopPlugin(
         lastRun?.let { lastRun ->
             if (lastRun.lastAPSRun > dateUtil.now() - 300 * 1000L) {
                 // do not send if result is older than 1 min
+                // A client of this version works the ISF for carbs out itself from the stored results
+                // (IsfForCarbs). The finished value stays in the device status for older clients.
+                val now = dateUtil.now()
+                val isfMgdlForCarbs = IsfForCarbs.load(persistenceLayer, now, now).isfMgdl(profile, now)
                 apsResult = lastRun.request?.json()?.with {
                     put("timestamp", dateUtil.toISOString(lastRun.lastAPSRun))
-                    put("isfMgdlForCarbs", profile.getIsfMgdlForCarbs(dateUtil.now(), "LoopPlugin", config, processedDeviceStatusData))
+                    put("isfMgdlForCarbs", isfMgdlForCarbs)
                 }
                 iob = lastRun.request?.iob?.jsonObject(dateUtil)?.with {
                     put("time", dateUtil.toISOString(lastRun.lastAPSRun))

@@ -309,7 +309,13 @@ enum class NotificationId(
     COMBO_UNKNOWN_BOLUS(URGENT, PUMP),
 
     /** A bolus asked from a Garmin watch was refused, limited or not delivered. */
-    GARMIN_BOLUS(IMPORTANT, SYNC);
+    GARMIN_BOLUS(IMPORTANT, SYNC),
+
+    // Desktop only: no OS key store was found (Linux without a keyring), so the keys that protect the settings
+    // and the pairing secrets are plain files next to the data. IMPORTANT, not URGENT: nothing is wrong with
+    // therapy, but a copy of the folder gives everything away, and the user can fix it. Appended at the END for
+    // the same reason as above.
+    SECRETS_NOT_PROTECTED(IMPORTANT, SYSTEM);
 
     companion object {
 

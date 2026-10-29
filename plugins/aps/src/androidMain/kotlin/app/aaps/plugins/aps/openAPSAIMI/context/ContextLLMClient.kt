@@ -2,7 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.context
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
 import app.aaps.plugins.aps.openAPSAIMI.advisor.AiCoachingService
 import app.aaps.plugins.aps.openAPSAIMI.context.ContextIntent.*
 import app.aaps.plugins.aps.openAPSAIMI.llm.LlmWorldConservativePreamble
@@ -39,7 +39,7 @@ import kotlin.time.Duration.Companion.minutes
 @SingleIn(AppScope::class)
 class ContextLLMClient @Inject constructor(
     private val aiCoachingService: AiCoachingService,
-    private val sp: SP,
+    private val sp: KeyValueStore,
     private val aapsLogger: AAPSLogger,
     private val context: android.content.Context
 ) {

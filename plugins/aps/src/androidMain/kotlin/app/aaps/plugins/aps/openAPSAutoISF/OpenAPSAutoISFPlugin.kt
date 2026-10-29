@@ -2,8 +2,6 @@ package app.aaps.plugins.aps.openAPSAutoISF
 
 import android.content.Context
 import android.content.Intent
-import androidx.collection.LongSparseArray
-import androidx.collection.forEach
 import app.aaps.core.data.aps.SMBDefaults
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.model.AIV
@@ -11,7 +9,7 @@ import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.SC
 import app.aaps.core.data.model.HR
 import app.aaps.core.data.plugin.PluginType
-import app.aaps.core.data.time.T
+import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.aps.APS
 import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.AutosensResult
@@ -33,8 +31,6 @@ import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.notifications.NotificationId
-import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.EnforcedState
@@ -43,7 +39,6 @@ import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
-import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
@@ -137,7 +132,6 @@ open class OpenAPSAutoISFPlugin(
     private val bgQualityCheck: BgQualityCheck,
     notificationManager: NotificationManager,
     private val determineBasalAutoISF: DetermineBasalAutoISF,
-    private val profiler: Profiler,
     private val glucoseStatusCalculatorAutoIsf: GlucoseStatusCalculatorAutoIsf,
     private val apsResultProvider: () -> APSResult,
     private val ch: ConcentrationHelper,
@@ -206,7 +200,6 @@ open class OpenAPSAutoISFPlugin(
     val mgdlHalfBasalExerciseTarget;  get() = preferences.get(IntKey.ApsAutoIsfHalfBasalExerciseTarget) * if (profileFunction.getUnits() == GlucoseUnit.MMOL) GlucoseUnit.MMOLL_TO_MGDL else 1.0
     val normalTarget = Constants.NORMAL_TARGET_MGDL
     val calibrationDuration = preferences.get(IntKey.FslCalibrationDuration)
-    private val minutesClass; get() = if (preferences.get(IntKey.ApsMaxSmbFrequency) == 1) 6L else 30L  // ga-zelle: later get correct 1 min CGM flag from glucoseStatus ? ... or from apsResults?
     // create array for key AutoISF results with defaults
     var autoIsfValues = AIV(
         timestamp = 0L,
@@ -241,18 +234,6 @@ open class OpenAPSAutoISFPlugin(
 
     override suspend fun onStart() {
         super.onStart()
-        var count = 0
-        val apsResults = persistenceLayer.getApsResults(dateUtil.now() - T.days(1).msecs(), dateUtil.now())
-        apsResults.forEach {
-            val glucose = it.glucoseStatus?.glucose ?: return@forEach
-            val variableSens = it.variableSens ?: return@forEach
-            val timestamp = it.date
-            val key = timestamp - timestamp % T.mins(minutesClass).msecs() + glucose.toLong()
-            if (variableSens > 0) synchronized(autoIsfCache) { autoIsfCache.put(key, variableSens) }
-            count++
-        }
-        aapsLogger.debug(LTag.APS, "Loaded $count variable sensitivity values from database")
-
         // 🏃 Start MTR Steps Manager (shared with AIMI — ref-counted)
         try {
             stepsManager.ensureStarted()
@@ -275,61 +256,14 @@ open class OpenAPSAutoISFPlugin(
 
     override fun usingDynamicIsf() = true //: Boolean = preferences.get(BooleanKey.ApsUseAutoIsf)
 
-    override fun getIsfMgdl(profile: Profile, caller: String): Double? {
-        val start = dateUtil.now()
-        val multiplier = (profile as ProfileSealed.EPS).value.originalPercentage / 100.0
-        val sensitivity = runBlocking { calculateVariableIsf(start) }
-        if (sensitivity.second == null && caller == "OpenAPSSMBPlugin")
-            notificationManager.post(
-                NotificationId.DYN_ISF_FALLBACK,
-                ApsStrings.fallback_to_isf_no_tdd.withArgs(sensitivity.first),
-                level = NotificationLevel.INFO, date = start, validTo = dateUtil.now() + T.mins(1).msecs()
-            )
-        else
-            notificationManager.dismiss(NotificationId.DYN_ISF_FALLBACK)
-        profiler.log(LTag.APS, String.format(Locale.getDefault(), "getIsfMgdl() %s %f %s %s", sensitivity.first, sensitivity.second, dateUtil.dateAndTimeAndSecondsString(start), caller), start)
-        return sensitivity.second?.let { it * multiplier }
-    }
-
-    override fun getAverageIsfMgdl(timestamp: Long, caller: String): Double? {
-        var count = 0
-        var sum = 0.0
-        val start = timestamp - T.hours(24).msecs()
-        synchronized(autoIsfCache) {
-            autoIsfCache.forEach { key, value ->
-                if (key in start..timestamp) {
-                    count++
-                    sum += value
-                }
-            }
-        }
-        val sensitivity = if (count == 0) null else sum / count
-        //aapsLogger.debug(LTag.APS, "getAverageIsfMgdl() $sensitivity from $count values ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $caller")
-        return sensitivity
-    }
+    /**
+     * AutoISF works out its ISF inside its own run, as variable_sens. Every other caller gets the profile ISF,
+     * so this must answer null. It used to run autoISF() here as well, only to fill a cache for the old
+     * average ISF for carbs. That average is now worked out from the stored results, see `IsfForCarbs`.
+     */
+    override fun getIsfMgdl(profile: Profile, caller: String): Double? = null
 
     override fun getSensitivityOverviewString(): String? = null // placeholder for Auto ISF Detailed information for overview
-
-    private val autoIsfCache = LongSparseArray<Double>()
-
-    private suspend fun calculateVariableIsf(timestamp: Long): Pair<String, Double?> {
-        val profile = profileFunction.getProfile(timestamp) ?: return Pair("OFF", null)
-        val glucose = glucoseStatusProvider.glucoseStatusData?.glucose ?: return Pair("GLUC", null)
-        // Round down to minutesClass min and use it as a key for caching
-        // Add BG to key as it affects calculation
-        val key = timestamp - timestamp % T.mins(minutesClass).msecs() + glucose.toLong()
-        val sensitivity = autoISF(profile)
-        if (sensitivity > 0) {
-            // can default to 0, e.g. for the first 2-3 loops in a virgin setup
-            aapsLogger.debug("calculateVariableIsf CALC ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $sensitivity")
-            synchronized(autoIsfCache) {
-                autoIsfCache.put(key, sensitivity)
-                if (autoIsfCache.size() > 1000) autoIsfCache.clear()
-            }
-        }
-        // this return is mandatory, otherwise it messed up the AutoISF algo.
-        return Pair("OFF", null)
-    }
 
     override suspend fun invoke(initiator: String, tempBasalFallback: Boolean) = withContext(Dispatchers.Default) {
         aapsLogger.debug(LTag.APS, "invoke from $initiator tempBasalFallback: $tempBasalFallback")
@@ -805,11 +739,11 @@ open class OpenAPSAutoISFPlugin(
             }
         } else {
             // stepsservice not really working on my deice. Only for fallback.
-            recentSteps5Minutes = StepService.getRecentStepCount5Min()
-            recentSteps10Minutes = StepService.getRecentStepCount10Min()
-            recentSteps15Minutes = StepService.getRecentStepCount15Min()
-            recentSteps30Minutes = StepService.getRecentStepCount30Min()
-            recentSteps60Minutes = StepService.getRecentStepCount60Min()
+            recentSteps5Minutes = StepService.getRecentStepCount5Min() ?: 0
+            recentSteps10Minutes = StepService.getRecentStepCount10Min() ?: 0
+            recentSteps15Minutes = StepService.getRecentStepCount15Min() ?: 0
+            recentSteps30Minutes = StepService.getRecentStepCount30Min() ?: 0
+            recentSteps60Minutes = StepService.getRecentStepCount60Min() ?: 0
         }
 
         aapsLogger.debug(LTag.APS, "Activity Monitor: Steps: $recentSteps5Minutes $recentSteps10Minutes $recentSteps15Minutes ")
