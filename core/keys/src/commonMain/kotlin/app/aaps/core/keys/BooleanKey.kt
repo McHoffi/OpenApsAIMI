@@ -386,6 +386,18 @@ enum class BooleanKey(
     AimiEndometriosisPainFlare( "aimi_endo_flare", false, title = TextRef.Literal("")),
     AimiEndometriosisHormonalSuppression( "aimi_endo_suppression", false, title = TextRef.Literal("")),
     AimiEndometriosisEnable( "aimi_endo_enable", false, title = TextRef.Literal("")),
+    /**
+     * Build the HRV baseline from one value per night instead of one per physio pipeline run.
+     *
+     * The pipeline runs every 15 minutes while HRV itself arrives a few times a night, so counting
+     * runs makes a "7-day" baseline that really covers about 7 hours and collapses the spread. The
+     * HRV z-score and `HrvDepression` divide by that spread on the way to an insulin decision.
+     * Off by default: the night path is newer and has not been measured on real days yet.
+     */
+    AimiHrvBaselinePerNight(
+        "aimi_hrv_baseline_per_night", false,
+        title = KeysStrings.pref_title_aimi_hrv_baseline_per_night,
+        summary = KeysStrings.pref_summary_aimi_hrv_baseline_per_night),
     AimiPhysioDebugLogs( "aimi_physio_debug_logs", false, title = TextRef.Literal("")),
     AimiPhysioLLMAnalysisEnable( "aimi_physio_llm_enable", false, title = TextRef.Literal("")),
     AimiPhysioHRVDataEnable( "aimi_physio_hrv_enable", true, title = TextRef.Literal("")),

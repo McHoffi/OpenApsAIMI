@@ -995,7 +995,7 @@ class LoopPlugin(
                                         lastRun.lastSMBEnact = dateUtil.now()
                                         scheduleBuildAndStoreDeviceStatus("applySMBRequest")
                                     } else {
-                                        scheduleSmbFallback(allowNotification)
+                                        onSmbNotEnacted(allowNotification, tempBasalFallback)
                                     }
                                 } else {
                                     aapsLogger.debug(LTag.APS, "No SMB requested")
@@ -1198,6 +1198,27 @@ class LoopPlugin(
                 return commandQueue.tempBasalAbsolute(request.rate, request.duration, false, profile, PumpSync.TemporaryBasalType.NORMAL)
             }
         }
+    }
+
+    /**
+     * An SMB was asked for and not enacted. Re-run the loop once with `tempBasalFallback = true`, so
+     * the temp basal still gets a chance - but only from a normal run, never from a fallback run.
+     *
+     * oref sends no SMB in a fallback run, but AIMI can: `SmbSwitchGate` lets the meal prebolus owners
+     * through even when `microBolusAllowed` is false. While the refusal held (for example a paused SMB,
+     * or a bolus waiting for confirmation), each fallback run asked again, was refused again and
+     * scheduled the next one: a loop run every 1-2 s for minutes. The temp basal of the fallback run
+     * is already applied at this point, so stopping here loses nothing.
+     *
+     * @return true when a fallback run was scheduled.
+     */
+    internal fun onSmbNotEnacted(allowNotification: Boolean, tempBasalFallback: Boolean): Boolean {
+        if (tempBasalFallback) {
+            aapsLogger.debug(LTag.APS, "SMB not enacted in a fallback run, no further fallback")
+            return false
+        }
+        scheduleSmbFallback(allowNotification)
+        return true
     }
 
     // Internal for the tests of its checks, without driving a whole loop run to the SMB branch.

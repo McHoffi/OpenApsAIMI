@@ -6,6 +6,7 @@ import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.StepDevices
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.keys.BooleanNonKey
@@ -107,6 +108,7 @@ class GarminPluginTest : TestBaseWithProfile() {
         verify(loopHub, atMost(1)).postCarbs(any())
         verify(loopHub, atMost(3)).temporaryBasalHistory(any())
         verify(loopHub, atMost(3)).smbHistoryTimestamps(any())
+        verify(loopHub, atMost(3)).postBolus(any(), any())
         verifyNoMoreInteractions(loopHub)
     }
 
@@ -723,4 +725,95 @@ class GarminPluginTest : TestBaseWithProfile() {
         verify(loopHub, atLeastOnce()).smbHistoryTimestamps(any())
     }
 
+    /** The bolus texts come from the generated strings, so the tests read the real sentences. */
+    private fun useRealText() {
+        val text = generatedTextResolver("sync" to SyncStringsValues::textOf)
+        gp = GarminPlugin(aapsLogger, text, preferences, mock<SP>(), context, loopHub, persistenceLayer, config, notificationManager)
+        gp.clock = clock
+    }
+
+    private fun verifyBolusNotification(text: String) {
+        verify(notificationManager).post(eq(NotificationId.GARMIN_BOLUS), eq(text), any(), any<Int>(), anyOrNull(), any(), anyOrNull())
+    }
+
+    @Test
+    fun onPostBolus_refusedOnClient() {
+        useRealText()
+        whenever(config.AAPSCLIENT).thenReturn(true)
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(createUri(mapOf("bolus" to 1.5))))
+        verifyBolusNotification("The Garmin watch asked for a bolus of 1.50 U. This phone is a client, so no bolus was given. Give it in AAPS.")
+    }
+
+    @Test
+    fun onPostBolus_refusedWithoutKey() {
+        useRealText()
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("")
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(createUri(mapOf("bolus" to 1.5))))
+        verifyBolusNotification("The Garmin watch asked for a bolus of 1.50 U. No bolus was given: a bolus from the watch needs a request key in the Garmin settings.")
+    }
+
+    @Test
+    fun onPostBolus_invalidAmountRefused() {
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(createUri(mapOf("bolus" to 0))))
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(createUri(mapOf("bolus" to "NaN"))))
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(createUri(emptyMap())))
+        verifyNoMoreInteractions(notificationManager)
+    }
+
+    @Test
+    fun onPostBolus_givenThenRepeatBlockedForOneMinute() {
+        useRealText()
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        whenever(loopHub.postBolus(eq(1.5), any())).thenReturn(1.5)
+        val uri = createUri(mapOf("bolus" to 1.5))
+
+        assertEquals("{\"ok\":true,\"bolus\":1.5}", gp.onPostBolus(uri))
+        // Same request again a moment later: refused.
+        gp.clock = Clock.offset(clock, Duration.ofSeconds(30))
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(uri))
+        verifyBolusNotification("The Garmin watch asked for a bolus of 1.50 U less than one minute after the last one. No bolus was given, so a repeated request cannot give it twice. Ask again in a minute if you really want it.")
+        // After one minute a new bolus is allowed again.
+        gp.clock = Clock.offset(clock, Duration.ofMillis(GarminPlugin.BOLUS_REPEAT_BLOCK_MS + 1_000))
+        assertEquals("{\"ok\":true,\"bolus\":1.5}", gp.onPostBolus(uri))
+        verify(loopHub, times(2)).postBolus(eq(1.5), any())
+    }
+
+    @Test
+    fun onPostBolus_limitedByMaxBolusIsNotified() {
+        useRealText()
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        whenever(loopHub.postBolus(eq(12.0), any())).thenReturn(10.0)
+        assertEquals("{\"ok\":true,\"bolus\":10.0}", gp.onPostBolus(createUri(mapOf("bolus" to 12.0))))
+        verify(loopHub).postBolus(eq(12.0), any())
+        verifyBolusNotification("The Garmin watch asked for a bolus of 12.00 U. It was limited to the maximum bolus: 10.00 U.")
+    }
+
+    @Test
+    fun onPostBolus_refusedByLimitsDoesNotStartTheRepeatBlock() {
+        useRealText()
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        whenever(loopHub.postBolus(eq(2.0), any())).thenReturn(0.0)
+        val uri = createUri(mapOf("bolus" to 2.0))
+        assertEquals(GarminPlugin.BOLUS_REFUSED_JSON, gp.onPostBolus(uri))
+        verifyBolusNotification("The Garmin watch asked for a bolus of 2.00 U. No bolus was given: the bolus limits do not allow it now.")
+        // Nothing was given, so a new try is not blocked as a repeat.
+        whenever(loopHub.postBolus(eq(2.0), any())).thenReturn(2.0)
+        assertEquals("{\"ok\":true,\"bolus\":2.0}", gp.onPostBolus(uri))
+        verify(loopHub, times(2)).postBolus(eq(2.0), any())
+    }
+
+    @Test
+    fun onPostBolus_queueFailureIsNotified() {
+        useRealText()
+        whenever(preferences.get(GarminStringKey.RequestKey)).thenReturn("foo")
+        whenever(loopHub.postBolus(eq(1.0), any())).thenAnswer { i ->
+            i.getArgument<(String) -> Unit>(1).invoke("Loop is suspended")
+            1.0
+        }
+        gp.onPostBolus(createUri(mapOf("bolus" to 1.0)))
+        verify(loopHub).postBolus(eq(1.0), any())
+        verifyBolusNotification("The Garmin watch asked for a bolus of 1.00 U. It was not given: Loop is suspended")
+    }
 }

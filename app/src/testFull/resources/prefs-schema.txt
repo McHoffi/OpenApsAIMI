@@ -147,6 +147,7 @@ aimi_endo_flare|BooleanKey|true
 aimi_endo_smb_dampen|DoubleKey|true
 aimi_endo_suppression|BooleanKey|true
 aimi_hormonitor_viewer_compose|ApsIntentKey|false
+aimi_hrv_baseline_per_night|BooleanKey|true
 aimi_hypo_risk_alarm_info|ApsIntentKey|false
 aimi_isf_fusion_max_change_per_tick|DoubleKey|true
 aimi_isf_fusion_max_factor|DoubleKey|true

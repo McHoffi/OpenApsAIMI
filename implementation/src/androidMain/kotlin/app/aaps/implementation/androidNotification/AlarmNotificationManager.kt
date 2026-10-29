@@ -48,7 +48,7 @@ import dev.zacsweers.metro.SingleIn
  *    screen stays dark. When the activity does launch it takes over the looping/ramped audio.
  *  - [postSoundOnlyAlarm]: posts on a sound-bearing channel chosen by the
  *    [BooleanKey.AlertOverrideDoNotDisturb] preference. No activity, system plays channel sound.
- * Channels are created on the first post rather than at construction - see the `channels` field. Both
+ * Channels are created on the first post rather than at construction - see `ensureChannels`. Both
  * posting methods touch it before building anything, so a post can still never race their creation.
  */
 @SingleIn(AppScope::class)
@@ -181,15 +181,48 @@ class AlarmNotificationManager(
     private var unansweredAlarm: Intent? = null
     private val fullScreenLock = Any()
 
+    /** Whether [ensureChannels] has created the channels at least once. */
+    private var channelsCreated = false
+
     /**
-     * The channels, created once on first use rather than in an `init` block.
-     * Android requires a channel to exist before anything posts to it, and **every** post goes through
-     * [postFullScreenAlarm] or [postSilentAlarmNotification], both of which touch this first. So the
-     * guarantee is the same as creating them in the constructor - and stronger in one way: it cannot be
-     * missed by a code path that gets an instance some other way.
-     * `lazy` is synchronized by default, so two threads posting at once still create them once.
+     * Whether the channels were last created while AAPS held Do Not Disturb access.
+     *
+     * Android honours `setBypassDnd(true)` only when the channel is created (or created again) while
+     * the app holds that access. So the channels made before the user granted it ring in Do Not
+     * Disturb only after the next app start. [ensureChannels] creates them again once access is there.
+     * For an existing channel Android then applies the bypass only when the user has not edited the
+     * channel, and keeps sound and vibration as they were.
      */
-    private val channels: Unit by lazy { createChannels() }
+    private var channelsHaveDndAccess = false
+
+    private fun hasDndAccess(): Boolean =
+        try {
+            mgr.isNotificationPolicyAccessGranted
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Creates the channels on first use rather than in an `init` block, and again once Do Not Disturb
+     * access is granted. Android requires a channel to exist before anything posts to it, and **every**
+     * post goes through [postFullScreenAlarm] or [postSilentAlarmNotification], both of which call this
+     * first. So the guarantee is the same as creating them in the constructor - and stronger in one way:
+     * it cannot be missed by a code path that gets an instance some other way.
+     * Synchronized, so two threads posting at once still create them once.
+     */
+    @Synchronized
+    private fun ensureChannels() {
+        val hasDndAccess = hasDndAccess()
+        if (!channelsCreated) {
+            createChannels()
+            channelsCreated = true
+            channelsHaveDndAccess = hasDndAccess
+        } else if (!channelsHaveDndAccess && hasDndAccess) {
+            createChannels()
+            channelsHaveDndAccess = true
+            aapsLogger.debug(LTag.NOTIFICATION, "Alarm channels created again after Do Not Disturb access was granted")
+        }
+    }
 
     private fun createChannels() {
         mgr.createNotificationChannelGroup(NotificationChannelGroup(GROUP_ID, context.getString(R.string.alarm_channel_group)))
@@ -365,7 +398,7 @@ class AlarmNotificationManager(
      * alarm screen offers +5 min instead of its 5 minute mute.
      */
     fun postFullScreenAlarm(status: String, title: String, sound: AlarmSound?, eatReminder: Boolean = false) {
-        channels // created on first post, see the field
+        ensureChannels()
         // Reached only from the background / off-main branches of UiInteraction.runAlarm.
         //
         // Screen-wake + full-screen ErrorActivity launch no longer rely on USE_FULL_SCREEN_INTENT
@@ -545,7 +578,7 @@ class AlarmNotificationManager(
         urgent: Boolean,
         alarmAction: AlarmAction? = null
     ) {
-        channels // created on first post, see the field
+        ensureChannels()
         val builder = NotificationCompat.Builder(context, if (urgent) CHANNEL_SILENT_URGENT else CHANNEL_SILENT)
             .setSmallIcon(iconsProvider.getNotificationIcon())
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, iconsProvider.getIcon()))
@@ -605,6 +638,7 @@ class AlarmNotificationManager(
         urgent: Boolean,
         alarmAction: AlarmAction? = null
     ) {
+        ensureChannels()
         val channelId = channelIdForSound(sound, overrideDnd = true)
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(iconsProvider.getNotificationIcon())

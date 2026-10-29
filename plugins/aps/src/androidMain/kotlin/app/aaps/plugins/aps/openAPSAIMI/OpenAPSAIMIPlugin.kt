@@ -2145,6 +2145,7 @@ open class OpenAPSAIMIPlugin  @Inject constructor(
                     add(BooleanKey.AimiPhysioSleepDataEnable)
                     add(BooleanKey.AimiPhysioHRVDataEnable)
                     add(BooleanKey.AimiPhysioLLMAnalysisEnable)
+                    add(BooleanKey.AimiHrvBaselinePerNight)
                     add(BooleanKey.AimiPhysioDebugLogs)
                 },
             )
