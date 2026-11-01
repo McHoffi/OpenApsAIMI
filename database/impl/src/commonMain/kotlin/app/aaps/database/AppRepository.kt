@@ -26,6 +26,8 @@ import app.aaps.database.entities.UserEntry
 import app.aaps.database.entities.data.NewEntries
 import app.aaps.database.entities.embedments.InterfaceIDs
 import app.aaps.database.entities.interfaces.DBEntry
+import app.aaps.database.transactions.InsertBolusWithTempIdTransaction
+import app.aaps.database.transactions.InsertTemporaryBasalWithTempIdTransaction
 import app.aaps.database.transactions.Transaction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -39,6 +41,9 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -86,6 +91,7 @@ data class DatabaseMaintenanceRaw(
     val report: String
 )
 
+@OptIn(ExperimentalAtomicApi::class)
 class AppRepository internal constructor(
     databaseProvider: () -> AppDatabase
 ) : AutoCloseable {
@@ -153,6 +159,8 @@ class AppRepository internal constructor(
                     transaction.run()
                 }
             }
+            // Drop the temp basal and bolus copies first, so nobody reads stale data after the change event.
+            invalidateSnapshotsIfNeeded(changes, transaction)
             // Notify observers
             if (changes.isNotEmpty()) {
                 _changeFlow.emit(changes)
@@ -179,6 +187,8 @@ class AppRepository internal constructor(
                     transaction.run()
                 }
             }
+            // Drop the temp basal and bolus copies first, so nobody reads stale data after the change event.
+            invalidateSnapshotsIfNeeded(changes, transaction)
             // Notify observers
             if (changes.isNotEmpty()) {
                 _changeFlow.emit(changes)
@@ -187,6 +197,8 @@ class AppRepository internal constructor(
         }
 
     suspend fun clearDatabases() {
+        invalidateTbrSnapshot()
+        invalidateBolusSnapshot()
         database.clearAllTablesCompat()
         repositoryScope.launch { _databaseClearedFlow.emit(Unit) }
     }
@@ -199,6 +211,8 @@ class AppRepository internal constructor(
      * Device statuses have their own, much shorter limit: [DEVICE_STATUS_KEEP_DAYS] days before now.
      */
     suspend fun cleanupDatabase(than: Long, deleteTrackedChanges: Boolean, runVacuum: Boolean = false): String {
+        invalidateTbrSnapshot()
+        invalidateBolusSnapshot()
         database.useWriterConnection { connection -> connection.usePrepared("PRAGMA optimize") { it.step() } }
         val removed = mutableListOf<Pair<String, Int>>()
         removed.add(Pair("APSResult", database.apsResultDao.deleteOlderThan(than)))
@@ -739,14 +753,22 @@ class AppRepository internal constructor(
     suspend fun getBoluses(): List<Bolus> =
         database.bolusDao.getAllBoluses()
 
+    // A direct write, outside a transaction: the bolus copy must be dropped here, or the IOB code keeps reading
+    // the old insulin settings from memory.
     suspend fun bulkMigrateBolusInsulinConfig(label: String, end: Long, peak: Long, conc: Double): Int =
-        database.bolusDao.bulkMigrateInsulinConfig(label, end, peak, conc)
+        database.bolusDao.bulkMigrateInsulinConfig(label, end, peak, conc).also { invalidateBolusSnapshot() }
 
-    suspend fun getBolusesDataFromTime(timestamp: Long, ascending: Boolean): List<Bolus> =
-        database.bolusDao.getBolusesFromTime(timestamp).reversedIf(!ascending)
+    suspend fun getBolusesDataFromTime(timestamp: Long, ascending: Boolean): List<Bolus> {
+        val snapshot = bolusSnapshotCovering(timestamp)
+        val rows = snapshot?.rows?.filter { it.timestamp >= timestamp } ?: database.bolusDao.getBolusesFromTime(timestamp)
+        return rows.reversedIf(!ascending)
+    }
 
-    suspend fun getBolusesDataFromTimeToTime(from: Long, to: Long, ascending: Boolean): List<Bolus> =
-        database.bolusDao.getBolusesFromTime(from, to).reversedIf(!ascending)
+    suspend fun getBolusesDataFromTimeToTime(from: Long, to: Long, ascending: Boolean): List<Bolus> {
+        val snapshot = bolusSnapshotCovering(from)
+        val rows = snapshot?.rows?.filter { it.timestamp in from..to } ?: database.bolusDao.getBolusesFromTime(from, to)
+        return rows.reversedIf(!ascending)
+    }
 
     suspend fun getBolusesIncludingInvalidFromTime(timestamp: Long, ascending: Boolean): List<Bolus> =
         database.bolusDao.getBolusesIncludingInvalidFromTime(timestamp).reversedIf(!ascending)
@@ -907,8 +929,107 @@ class AppRepository internal constructor(
         }
     }
 
-    suspend fun getTemporaryBasalActiveAt(timestamp: Long): TemporaryBasal? =
-        database.temporaryBasalDao.getTemporaryBasalActiveAt(timestamp)
+    private companion object {
+        /**
+         * The copy covers this much history (5 days) and is reloaded after the max age (6 hours) at the latest.
+         * It must be longer than [TemporaryBasalQueryBounds.MAX_ACTIVE_LOOKBACK_MS] (4 days): an "active at T"
+         * question reads from T minus 4 days, and only a copy that reaches that far back can answer it. With 5
+         * days the copy answers every question up to one day before it was loaded; older ones go to SQL.
+         */
+        const val TBR_SNAPSHOT_WINDOW_MS = 5L * 24 * 60 * 60 * 1000
+        const val TBR_SNAPSHOT_MAX_AGE_MS = 6L * 60 * 60 * 1000
+    }
+
+    /**
+     * In-memory copy of the recent valid temp basals (oldest first). The "which temp basal is active at T"
+     * question is asked very often (IOB/COB, graphs, notifications, watch), and every ask used to scan
+     * the table. The copy is dropped at once when any temp basal is written (see
+     * [invalidateSnapshotsIfNeeded]), so an answer from memory is the same as the SQL answer.
+     */
+    /**
+     * [epoch] is the write count when the copy was loaded. The copy is used only while that count has not
+     * changed, so a copy loaded while a write ran is never used after that write, even if it is stored after
+     * the write dropped the previous one.
+     */
+    private class TbrSnapshot(val fromTimestamp: Long, val loadedAtMs: Long, val epoch: Long, val rows: List<TemporaryBasal>)
+
+    @Volatile
+    private var tbrSnapshot: TbrSnapshot? = null
+    private val tbrEpoch = AtomicLong(0L)
+
+    private fun invalidateTbrSnapshot() {
+        tbrEpoch.incrementAndFetch()
+        tbrSnapshot = null
+    }
+
+    /**
+     * Drops the copies after a transaction that wrote a temp basal or a bolus.
+     *
+     * [changes] holds what the delegated DAOs recorded, which covers `insertNewEntry` and `updateExistingEntry`.
+     * Two transactions write with a plain `insert`, which records nothing: the pump sync with a temporary id
+     * (Medtrum, Medtronic, Apex). Without the check on [transaction], a bolus or temp basal written that way
+     * stayed out of the copy - out of the IOB - until the next write, or for up to 6 hours.
+     */
+    private fun invalidateSnapshotsIfNeeded(changes: List<DBEntry>, transaction: Transaction<*>) {
+        if (transaction is InsertTemporaryBasalWithTempIdTransaction || changes.any { it is TemporaryBasal }) invalidateTbrSnapshot()
+        if (transaction is InsertBolusWithTempIdTransaction || changes.any { it is Bolus }) invalidateBolusSnapshot()
+    }
+
+    /** Same idea for boluses (valid, not historic, newest id first), used by the IOB and graph code. */
+    private class BolusSnapshot(val fromTimestamp: Long, val loadedAtMs: Long, val epoch: Long, val rows: List<Bolus>)
+
+    @Volatile
+    private var bolusSnapshot: BolusSnapshot? = null
+    private val bolusEpoch = AtomicLong(0L)
+
+    private fun invalidateBolusSnapshot() {
+        bolusEpoch.incrementAndFetch()
+        bolusSnapshot = null
+    }
+
+    private suspend fun bolusSnapshotCovering(from: Long): BolusSnapshot? {
+        val current = bolusSnapshot?.takeIf {
+            it.epoch == bolusEpoch.load() && Clock.System.now().toEpochMilliseconds() - it.loadedAtMs <= TBR_SNAPSHOT_MAX_AGE_MS
+        }
+        val snapshot = current ?: run {
+            // The epoch is read before the rows, see TbrSnapshot.
+            val epoch = bolusEpoch.load()
+            val now = Clock.System.now().toEpochMilliseconds()
+            val start = now - TBR_SNAPSHOT_WINDOW_MS
+            BolusSnapshot(start, now, epoch, database.bolusDao.getBolusesFromTime(start)).also { bolusSnapshot = it }
+        }
+        return snapshot.takeIf { from >= it.fromTimestamp }
+    }
+
+    /** The current temp basal copy, loaded again when a write happened since or it is too old. */
+    private suspend fun currentTbrSnapshot(): TbrSnapshot {
+        tbrSnapshot?.takeIf { it.epoch == tbrEpoch.load() && Clock.System.now().toEpochMilliseconds() - it.loadedAtMs <= TBR_SNAPSHOT_MAX_AGE_MS }
+            ?.let { return it }
+        // The epoch is read before the rows: a write that commits during the load counts after it, so this copy
+        // is never used again. This read still gets an answer the SQL could have given at that moment.
+        val epoch = tbrEpoch.load()
+        val now = Clock.System.now().toEpochMilliseconds()
+        val from = now - TBR_SNAPSHOT_WINDOW_MS
+        return TbrSnapshot(from, now, epoch, database.temporaryBasalDao.getTemporaryBasalDataFromTime(from)).also { tbrSnapshot = it }
+    }
+
+    suspend fun getTemporaryBasalActiveAt(timestamp: Long): TemporaryBasal? {
+        val earliest = TemporaryBasalQueryBounds.earliestTimestampForActiveAt(timestamp)
+        val maxDuration = TemporaryBasalQueryBounds.MAX_REASONABLE_DURATION_MS
+        val snapshot = currentTbrSnapshot()
+        if (earliest >= snapshot.fromTimestamp) {
+            // Same conditions as TemporaryBasalDao.getTemporaryBasalActiveAt. Rows are valid, not historic, oldest first.
+            return snapshot.rows.lastOrNull {
+                it.timestamp <= timestamp && it.timestamp >= earliest &&
+                    it.timestamp + it.duration > timestamp && it.duration <= maxDuration
+            }
+        }
+        return database.temporaryBasalDao.getTemporaryBasalActiveAt(
+            timestamp = timestamp,
+            earliestTimestamp = earliest,
+            maxReasonableDurationMs = maxDuration
+        )
+    }
 
     suspend fun getTemporaryBasalsActiveAt(timestamp: Long): List<TemporaryBasal> =
         database.temporaryBasalDao.getTemporaryBasalsActiveAt(timestamp)
@@ -916,8 +1037,16 @@ class AppRepository internal constructor(
     suspend fun getTemporaryBasalsStartingFromTime(timestamp: Long, ascending: Boolean): List<TemporaryBasal> =
         database.temporaryBasalDao.getTemporaryBasalDataFromTime(timestamp).reversedIf(!ascending)
 
-    suspend fun getTemporaryBasalsStartingFromTimeToTime(from: Long, to: Long, ascending: Boolean): List<TemporaryBasal> =
-        database.temporaryBasalDao.getTemporaryBasalStartingFromTimeToTime(from, to).reversedIf(!ascending)
+    suspend fun getTemporaryBasalsStartingFromTimeToTime(from: Long, to: Long, ascending: Boolean): List<TemporaryBasal> {
+        val snapshot = currentTbrSnapshot()
+        val rows = if (from >= snapshot.fromTimestamp) {
+            // Same conditions as the SQL query: valid, not historic, start time inside the range, oldest first.
+            snapshot.rows.filter { it.timestamp in from..to }
+        } else {
+            database.temporaryBasalDao.getTemporaryBasalStartingFromTimeToTime(from, to)
+        }
+        return rows.reversedIf(!ascending)
+    }
 
     suspend fun getTemporaryBasalsStartingFromTimeIncludingInvalid(timestamp: Long, ascending: Boolean): List<TemporaryBasal> =
         database.temporaryBasalDao.getTemporaryBasalDataIncludingInvalidFromTime(timestamp).reversedIf(!ascending)

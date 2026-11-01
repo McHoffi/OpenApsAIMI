@@ -767,6 +767,10 @@ enum class BooleanKey(
     OApsAIMIEnableStepsFromWatch( "count_steps_watch", false, title = TextRef.Literal("")),
     OApsAIMIEnableBasal( "key_enable_basal", false, title = TextRef.Literal("")),
     OApsAIMIMLtraining( "key_enable_ML_training", false, title = TextRef.Literal("")),
+    OApsAIMISmbTrainingRelaxedFilter(
+        "aimi_smb_training_relaxed_filter", true,
+        title = KeysStrings.pref_title_aimi_smb_training_relaxed_filter,
+        summary = KeysStrings.pref_summary_aimi_smb_training_relaxed_filter),
 
     ;
 

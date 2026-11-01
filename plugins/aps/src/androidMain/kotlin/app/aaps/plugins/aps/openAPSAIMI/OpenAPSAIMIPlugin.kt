@@ -2210,6 +2210,8 @@ open class OpenAPSAIMIPlugin  @Inject constructor(
             titleResId = R.string.aimi_lab_title,
             items = buildList {
                 // add(BooleanKey.OApsAIMIMLtraining)
+                // add(DoubleKey.OApsAIMISmbTrainingMinQuality)
+                // add(BooleanKey.OApsAIMISmbTrainingRelaxedFilter)
                 add(aimiComposeHormonitorViewerItem())
                 // MaxSMB / HighBGMaxSMB / HighBg live on the Core SMB screen.
                 // Pkpd / AdaptiveBasal / T3c / Trajectory / ManualModes / Autodrive live on the

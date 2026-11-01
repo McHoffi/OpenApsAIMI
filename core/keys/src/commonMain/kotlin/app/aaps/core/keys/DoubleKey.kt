@@ -605,6 +605,12 @@ enum class DoubleKey(
     OApsAIMIMealFactor( "key_oaps_aimi_meal_factor", 50.0, 1.0, 150.0, title = TextRef.Literal(""), unitType = UnitType.PERCENT),
     OApsAIMIPriorityMaxIobExtraU( "aimi_priority_max_iob_extra_u", 2.0, 0.0, 5.0, title = TextRef.Literal(""), unitType = UnitType.INSULIN),
     OApsAIMIPriorityMaxIobFactor( "aimi_priority_max_iob_factor", 1.20, 1.0, 1.6, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
+    /** Lower bound 0.30: below it the quality filter would let almost every row through. Slider step 0.01 (DOUBLE_2). */
+    OApsAIMISmbTrainingMinQuality(
+        "aimi_smb_training_min_quality", 0.40, 0.30, 1.0,
+        title = KeysStrings.pref_title_aimi_smb_training_min_quality,
+        summary = KeysStrings.pref_summary_aimi_smb_training_min_quality,
+        unitType = UnitType.DOUBLE_2),
     OApsAIMIRedCarpetRestoreThreshold( "aimi_red_carpet_restore_threshold", 0.75, 0.50, 0.95, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMIPkpdPragmaticReliefMinFactor( "aimi_pkpd_pragmatic_relief_min_factor", 0.75, 0.50, 1.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),
     OApsAIMISmbLateFatDamping( "aimi_smb_late_fat_damping", 0.7, 0.0, 1.0, title = TextRef.Literal(""), unitType = UnitType.DOUBLE_2),

@@ -1078,8 +1078,11 @@ class GarminPlugin(
                 }
                 jo.add("basalHistory", basalArr)
                 val smbArr = JsonArray()
-                for (ts in loopHub.smbHistoryTimestamps()) {
-                    smbArr.add(ts)
+                for (step in loopHub.smbHistory()) {
+                    val s = JsonObject()
+                    s.addProperty("t", step.t)
+                    s.addProperty("u", step.u)
+                    smbArr.add(s)
                 }
                 jo.add("smbHistory", smbArr)
             }
