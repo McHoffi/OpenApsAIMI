@@ -929,16 +929,6 @@ class AppRepository internal constructor(
         }
     }
 
-    private companion object {
-        /**
-         * The copy covers this much history (5 days) and is reloaded after the max age (6 hours) at the latest.
-         * It must be longer than [TemporaryBasalQueryBounds.MAX_ACTIVE_LOOKBACK_MS] (4 days): an "active at T"
-         * question reads from T minus 4 days, and only a copy that reaches that far back can answer it. With 5
-         * days the copy answers every question up to one day before it was loaded; older ones go to SQL.
-         */
-        const val TBR_SNAPSHOT_WINDOW_MS = 5L * 24 * 60 * 60 * 1000
-        const val TBR_SNAPSHOT_MAX_AGE_MS = 6L * 60 * 60 * 1000
-    }
 
     /**
      * In-memory copy of the recent valid temp basals (oldest first). The "which temp basal is active at T"
@@ -958,7 +948,7 @@ class AppRepository internal constructor(
     private val tbrEpoch = AtomicLong(0L)
 
     private fun invalidateTbrSnapshot() {
-        tbrEpoch.incrementAndFetch()
+        tbrEpoch.addAndFetch(1L)
         tbrSnapshot = null
     }
 
@@ -983,7 +973,7 @@ class AppRepository internal constructor(
     private val bolusEpoch = AtomicLong(0L)
 
     private fun invalidateBolusSnapshot() {
-        bolusEpoch.incrementAndFetch()
+        bolusEpoch.addAndFetch(1L)
         bolusSnapshot = null
     }
 
@@ -1193,6 +1183,15 @@ class AppRepository internal constructor(
     fun <T> Iterable<T>.reversedIf(reverse: Boolean): List<T> = if (reverse) this.reversed() else this.toList()
 
     companion object {
+
+        /**
+         * The copy covers this much history (5 days) and is reloaded after the max age (6 hours) at the latest.
+         * It must be longer than [TemporaryBasalQueryBounds.MAX_ACTIVE_LOOKBACK_MS] (4 days): an "active at T"
+         * question reads from T minus 4 days, and only a copy that reaches that far back can answer it. With 5
+         * days the copy answers every question up to one day before it was loaded; older ones go to SQL.
+         */
+        const val TBR_SNAPSHOT_WINDOW_MS = 5L * 24 * 60 * 60 * 1000
+        const val TBR_SNAPSHOT_MAX_AGE_MS = 6L * 60 * 60 * 1000
 
         /** How many days of device statuses [cleanupDatabase] keeps, whatever cutoff it is given. */
         const val DEVICE_STATUS_KEEP_DAYS = 2L

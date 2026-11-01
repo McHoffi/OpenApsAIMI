@@ -910,7 +910,7 @@ class GraphViewModel(
         val stepsText = if (stepsToday > 0) "$stepsToday / +$stepsDelta" else "--"
 
         // HR — latest non-zero BPM reading
-        val hrText = heartRateGraphFlow.value.heartRates
+        val hrText = heartRateGraphFlow.value.segments.flatten()
             .filter { it.value > 0 }.lastOrNull()?.value?.toInt()?.toString() ?: "--"
 
         // Last SMB (bolus)

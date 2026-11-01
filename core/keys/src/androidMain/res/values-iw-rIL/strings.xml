@@ -380,5 +380,4 @@
     <string name="lgs_threshold_summary">ערך הסוכר שמתחתיו מושהית הזרקת אינסולין. ערך ברירת המחדל משתמש במודל יעד סטנדרטי. המשתמש יכול להגדיר ערך בין 60 mg/dL (3.3 mmol/L) ל-100 mg/dL (5.5 mmol/L). ערכים מתחת ל-65/3.6 מביאים לשימוש במודל ברירת המחדל</string>
     <!-- IntentKey preferences -->
     <!--    Appearance preferences-->
-    <string name="pref_summary_ns_allow_client_control">אפשר למכשירי לקוח מצומדים לשלוח פקודות חתומות, כגון הפעלה או עצירה של תרחישים, דרך Nightscout.</string>
 </resources>

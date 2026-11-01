@@ -106,7 +106,7 @@ class GarminPluginTest : TestBaseWithProfile() {
         verify(loopHub, atMost(1)).postTherapyMode(any(), any())
         verify(loopHub, atMost(1)).postCarbs(any())
         verify(loopHub, atMost(3)).temporaryBasalHistory(any())
-        verify(loopHub, atMost(3)).smbHistoryTimestamps(any())
+        verify(loopHub, atMost(3)).smbHistory(any())
         verify(loopHub, atMost(3)).postBolus(any(), any())
         verifyNoMoreInteractions(loopHub)
     }
