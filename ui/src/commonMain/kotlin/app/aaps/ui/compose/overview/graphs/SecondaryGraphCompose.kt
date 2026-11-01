@@ -344,7 +344,7 @@ fun SecondaryGraphCompose(
         }
         SeriesType.VAR_SENSITIVITY -> viewModel.varSensGraphFlow.collectAsStateWithLifecycle().value.varSens
         SeriesType.DEV_SLOPE       -> viewModel.devSlopeGraphFlow.collectAsStateWithLifecycle().value.dsMax
-        SeriesType.HEART_RATE      -> viewModel.heartRateGraphFlow.collectAsStateWithLifecycle().value.heartRates
+        SeriesType.HEART_RATE      -> viewModel.heartRateGraphFlow.collectAsStateWithLifecycle().value.segments.flatten()
         SeriesType.STEPS           -> viewModel.stepsGraphFlow.collectAsStateWithLifecycle().value.steps
         SeriesType.ACTIVITY        -> viewModel.activityGraphFlow.collectAsStateWithLifecycle().value.activity
         SeriesType.PREDICTIONS     -> emptyList() // UI-only overlay flag, not a secondary series
@@ -401,15 +401,17 @@ fun SecondaryGraphCompose(
                 if (it.dsMax.isNotEmpty()) add(SeriesType.DEV_SLOPE to processPoints(it.dsMax, minTimestamp, minX, maxX))
                 // dsMin tagged separately via DEV_SLOPE_MIN marker (see below)
             }
-            hrData?.heartRates?.takeIf { it.isNotEmpty() }?.let {
-                // Skip if HR is the secondary (right-axis) series — rendered via secondaryLineData
-                if (secondaryType != SeriesType.HEART_RATE)
-                add(SeriesType.HEART_RATE to processPoints(it, minTimestamp, minX, maxX))
-            }
+            // One line per stretch, so the line has a break where the watch sent nothing. x is whole minutes, and
+            // two readings in the same minute would draw a vertical stroke.
+            // Skip if HR is the secondary (right-axis) series — rendered via secondaryLineData
+            if (secondaryType != SeriesType.HEART_RATE)
+                hrData?.segments?.forEach { segment ->
+                    add(SeriesType.HEART_RATE to processPoints(segment, minTimestamp, minX, maxX).distinctBy { it.first })
+                }
             stepsData?.steps?.takeIf { it.isNotEmpty() }?.let {
                 // Skip if Steps is the secondary (right-axis) series — rendered via secondaryLineData
                 if (secondaryType != SeriesType.STEPS)
-                add(SeriesType.STEPS to processPoints(it, minTimestamp, minX, maxX))
+                add(SeriesType.STEPS to processStepsColumns(it, minTimestamp, minX, maxX))
             }
             if (SeriesType.IOB_THRESHOLD in seriesTypes)
                 iobThData.iobTh.takeIf { it.isNotEmpty() }?.let {
@@ -540,8 +542,9 @@ fun SecondaryGraphCompose(
     val hasBasalLayer = wantsIobBasalOverlay && basalData != null
 
     // Process secondary (right axis) series
-    val processedSecondary = remember(secondaryLineData, stableTimeRange) {
+    val processedSecondary = remember(secondaryLineData, secondaryType, stableTimeRange) {
         if (!hasRealTimeRange || secondaryLineData.isEmpty()) return@remember emptyList()
+        if (secondaryType == SeriesType.STEPS) return@remember processStepsColumns(secondaryLineData, minTimestamp, minX, maxX)
         processPoints(secondaryLineData, minTimestamp, minX, maxX)
     }
 
@@ -1599,16 +1602,19 @@ fun createSeriesLine(type: SeriesType, colors: SeriesColors): LineCartesianLayer
             fill = LineCartesianLayer.LineFill.single(Fill(color)),
             areaFill = null
         )
-        // Points/dots only — no connecting line
-        SeriesType.HEART_RATE, SeriesType.STEPS                                  -> LineCartesianLayer.Line(
-            fill = LineCartesianLayer.LineFill.single(Fill(Color.Transparent)),
+        // Thin curved line, no fill, so it reads well over the steps columns
+        SeriesType.HEART_RATE                                                    -> LineCartesianLayer.Line(
+            fill = LineCartesianLayer.LineFill.single(Fill(color)),
+            stroke = LineCartesianLayer.LineStroke.Continuous(thickness = 1.5.dp),
             areaFill = null,
-            pointProvider = LineCartesianLayer.PointProvider.single(
-                LineCartesianLayer.Point(
-                    component = ShapeComponent(fill = Fill(color), shape = CircleShape),
-                    size = 4.dp
-                )
-            )
+            interpolator = LineCartesianLayer.Interpolator.cubic()
+        )
+        // Columns: a step line with solid area fill and no stroke
+        SeriesType.STEPS                                                         -> LineCartesianLayer.Line(
+            fill = LineCartesianLayer.LineFill.single(Fill(color)),
+            stroke = LineCartesianLayer.LineStroke.Continuous(thickness = 0.dp),
+            areaFill = LineCartesianLayer.AreaFill.single(Fill(color.copy(alpha = 0.5f))),
+            interpolator = Square
         )
         // Default: smooth line with gradient area fill
         else                                                                     -> LineCartesianLayer.Line(
@@ -2011,5 +2017,28 @@ internal fun fractionAlignedNiceRange(niceMin: Double, niceMax: Double, targetFr
     else niceNegativeSliver(-fraction / (1.0 - fraction) * niceMax) to niceMax
 }
 
+/** The minutes a steps point counts, see `StepsGraphData`. */
+private const val STEPS_COLUMN_MINUTES = 5.0
 
-
+/**
+ * The steps as columns, drawn with [Square]. A point counts the steps of the [STEPS_COLUMN_MINUTES]
+ * that start at its time. The watch sends one about every 40 seconds, so a column simply reaches to
+ * the next point. Where the next point is further away, the watch sent nothing: the column ends after
+ * its own minutes and the line goes down to zero. Without that, a gap of hours would be drawn as hours
+ * of the last count. The last column ends the same way.
+ *
+ * x is whole minutes, so two points can fall on the same minute. Only the newer one is kept.
+ */
+internal fun processStepsColumns(points: List<GraphDataPoint>, minTimestamp: Long, minX: Double, maxX: Double): List<Pair<Double, Double>> {
+    val perMinute = points.sortedBy { it.timestamp }.map { timestampToX(it.timestamp, minTimestamp) to it.value }.toMap().toList()
+    val columns = filterToRange(perMinute, minX, maxX)
+    return buildList {
+        columns.forEachIndexed { index, (x, y) ->
+            add(x to y)
+            val end = x + STEPS_COLUMN_MINUTES
+            val next = columns.getOrNull(index + 1)?.first
+            val close = minOf(end, maxX)
+            if ((next == null || next > end) && close > x) add(close to 0.0)
+        }
+    }
+}

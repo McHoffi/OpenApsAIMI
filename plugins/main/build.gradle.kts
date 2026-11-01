@@ -1,9 +1,5 @@
 plugins {
-    id("kmp-test-defaults")
-    kotlin("multiplatform")
-    // NOT com.android.library. AGP 9 refuses that plugin together with the multiplatform plugin.
-    // Same reason as the :core modules, :pump:virtual and the other converted plugins.
-    alias(libs.plugins.android.kmp.library)
+    id("kmp-android-library")
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose.multiplatform)
     // Metro, so this module can wire its own Android entry points. The rewrite of this build file
@@ -12,52 +8,21 @@ plugins {
     alias(libs.plugins.metro)
 }
 
-// Same generator as the other converted plugins, pointed at this module's strings. The strings do
-// not move, and AAPT keeps resolving them on Android exactly as before - this only adds a TextRef
-// named view of them that common code can reach.
-val generateMainStrings = tasks.register<GenerateKeyStringsTask>("generateMainStrings") {
-    resDir.set(layout.projectDirectory.dir("src/androidMain/res"))
-    packageName.set("app.aaps.plugins.main")
-    owner.set("main")
-    objectName.set("MainStrings")
-    idsObjectName.set("MainStringIds")
-    reportFile.set(layout.buildDirectory.file("reports/mainStrings/translations.txt"))
-    // Set explicitly: addGeneratedSourceDirectory derives its convention from the task name, so both
-    // properties would land on one directory and the second file written would delete the first.
-    commonOutputDir.set(layout.buildDirectory.dir("generated/mainStrings/common"))
-    androidOutputDir.set(layout.buildDirectory.dir("generated/mainStrings/android"))
-}
+registerKeyStrings("main")
 
 kotlin {
     android {
         namespace = "app.aaps.plugins.main"
-        compileSdk = Versions.compileSdk
-        minSdk = Versions.minSdk
         androidResources { enable = true }
         // isIncludeAndroidResources is what makes Robolectric work - see :core:ui for the detail.
         withHostTest {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
-        compilerOptions { jvmTarget.set(Versions.jvmTarget) }
-
-        lint {
-            checkReleaseBuilds = false
-            disable += "MissingTranslation"
-            disable += "ExtraTranslation"
-        }
     }
-
-    iosArm64()
-    iosSimulatorArm64()
-
-    // Desktop (Windows/macOS/Linux). Compose Multiplatform resolves its `desktop` variant from a
-    // plain jvm() target, so no special target name is needed.
-    jvm()
 
     sourceSets {
         commonMain {
-            kotlin.srcDir(generateMainStrings.flatMap { it.commonOutputDir })
             dependencies {
                 implementation(project(":core:data"))
                 implementation(project(":core:interfaces"))
@@ -78,8 +43,6 @@ kotlin {
         }
 
         androidMain {
-            // Android only: the string name to R.string id map.
-            kotlin.srcDir(generateMainStrings.flatMap { it.androidOutputDir })
             dependencies {
                 // The compose overview lives in :ui (GraphViewModel, BgGraphCompose and the glass
                 // detail screens use it). Present in the pre-KMP build file, dropped by the rewrite.

@@ -18,7 +18,7 @@
     <!-- Scene wizard: UI labels -->
     <!-- Scene wizard: chain step -->
     <!-- Scene list: chain indicator -->
-    <!-- Scene expiry: chain result notifications -->
+    <!-- Scene expiry: what the banner says, and the chain error notification -->
     <string name="scene_ended_format">Szene „%1$s“ beendet</string>
     <string name="scene_skip_to_format">Weiter zu %1$s</string>
     <string name="scene_template_alcohol">Alkohol</string>
